@@ -13,7 +13,7 @@
 #include "console.h"
 #include "ufs.h"
 
-#define UFS_BASE	0x01d84000UL	/* ufshc@1d84000, sweet live FDT */
+#define UFS_BASE	0x11270000UL
 
 #define REG_CAP		0x00
 #define REG_VER		0x08
@@ -120,7 +120,7 @@ static uint32_t scsi(uint8_t lun, const uint8_t *cdb, unsigned cdb_len, void *bu
 	ufs_wr(REG_UTRLDBR, 1);
 	uint64_t start = ticks();
 	while (ufs_rd(REG_UTRLDBR) & 1) {
-		if (ticks() - start > 19200000) {	/* 1 s */
+		if (ticks() - start > 13000000) {
 			ufs_wr(REG_UTRLCLR, ~1u);	/* clear slot 0 (write 0 to the bit) */
 			return 1;			/* timeout */
 		}
@@ -163,7 +163,15 @@ static const char *fs_type(uint32_t lba)
 	return "other";
 }
 
-/* One line per GPT entry of at least 64 MiB: name, first LBA, size in MiB (4K blocks). */
+static int str_eq(const char *a, const char *b)
+{
+	while (*a && *a == *b) {
+		a++;
+		b++;
+	}
+	return *a == *b;
+}
+
 static void list_partitions(uint32_t entry_lba, uint32_t nent)
 {
 	static uint8_t ents[128 * 128] __attribute__((aligned(4096)));
@@ -183,11 +191,10 @@ static void list_partitions(uint32_t entry_lba, uint32_t nent)
 			name[c] = (ch >= 32 && ch < 127) ? ch : (ch ? '?' : 0);
 		}
 		name[16] = 0;
-		if (((last - first + 1) >> 8) < 64)	/* keep the screen to the big ones */
+		if (((last - first + 1) >> 8) < 64)
 			continue;
 		con_hex2(name, "lba=", (uint32_t)first, "MiB=", (uint32_t)((last - first + 1) >> 8));
-		if (!__builtin_strcmp(name, "userdata") || !__builtin_strcmp(name, "cust") ||
-		    !__builtin_strcmp(name, "cache"))
+		if (str_eq(name, "userdata") || str_eq(name, "cust") || str_eq(name, "cache"))
 			con_str(" fs", fs_type((uint32_t)first));
 	}
 }

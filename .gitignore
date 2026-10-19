@@ -2,6 +2,8 @@
 backup/
 dtb/
 recovery/
+agate_analysis/boot_unpacked/kernel
+agate_analysis/boot_unpacked/ramdisk
 # third-party/Apple sources fetched for reading
 research/
 shim/out/

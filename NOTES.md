@@ -1,8 +1,41 @@
-# iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
+# iOS 16 on agate (Xiaomi 11T, MT6893 / Dimensity 1200) - working notes
 
-## Agent handoff / active work (2026-10-15, latest)
+## Agent handoff / active work (2026-10-19, latest)
 
-### >>> UPDATE 2026-10-18 (read first, then the 10-17 handoff below) <<<
+### >>> UPDATE 2026-10-19: Agate Adaptation Milestone 1 (Shim & Tools) <<<
+
+**STATE at 2026-10-19:**
+- Project adaptation from `ios-sweet` (Qualcomm SM7150) to `ios-agate` (MediaTek MT6893 / Dimensity 1200) in progress.
+- Stock firmware extracted and analysed in `agate_analysis/boot_unpacked/` (header.txt, dtb, agate.dts, agate_dtbo.dts).
+- Hardware facts confirmed from DT:
+  - RAM base `0x40000000`. Upper bank at `0x100000000` (`0xfcc00000`). Carve-outs all below `0xd0000000`.
+  - GICv3: GICD `0x0c000000` (size `0x40000`), GICR `0x0c040000` (size `0x200000`). Virtual timer INTID 27 (PPI 11), Physical timer INTID 30.
+  - Timer: 13.0 MHz (CNTFRQ `0xC65D40` = 13000000).
+  - Framebuffer: `0x7E020000` (from LK, `atag,videolfb-fb_base_l`, size `0x1BE0000`, 1080x2400, 32bpp, stride 4320).
+  - UFS: `0x11270000` (JEDEC UFSHCI, size `0x10000`).
+  - PSCI: `smc`, standard reset `0x84000009`, CPU_ON `0xC4000003`, MPIDR `core << 8` (`0x000`–`0x700`).
+  - CPUs: 4× Cortex-A55 (2.0 GHz) + 3× Cortex-A78 (2.6 GHz) + 1× Cortex-A78 Ultra (3.0 GHz).
+  - UART: debug UART0 at `0x11002000` (921600 baud).
+  - Buttons: MTK KPD `0x10010000` (vol) + PMIC MT6359 pwrap (power).
+  - No Qualcomm SPMI, GENI, or RPMh buses.
+- **Shim adaptation (`shim/`)**:
+  - `console.h` & `mmu.h`: Framebuffer address set to `0x7E020000UL`.
+  - `shim.c`: GICD set to `0x0c000000UL`, GICR to `0x0c040000UL` (size `0x200000UL`), VTIMER_INTID 27, PTIMER_INTID 30. Standard PSCI reset enabled. Timer calculations adjusted to 13 MHz.
+  - `ufs.c`: UFS base set to `0x11270000UL`, timer delays set to 13 MHz, custom `str_eq` implemented to prevent external library calls.
+  - `loader.c`: Accepts `AGATEXNU` and `SWEETXNU` payload magic.
+  - `build.sh`: Toolchain auto-detects `aarch64-linux-gnu-gcc` or `clang`/`ld.lld` with `-fpie`. Generates boot.img v2 with agate parameters (`--base 0x40000000 --kernel_offset 0x80000 --ramdisk_offset 0x11100000 --tags_offset 0x07c80000 --dtb_offset 0x07c80000 --pagesize 2048`).
+  - Built and verified: `shim/out/Image` and `shim/out/shim-boot.img`.
+- **Tools adaptation (`tools/`)**:
+  - `tools/mkbootimg.py`: Created standalone boot image v2 generator.
+  - `tools/mkadt.py`: Adapted for agate MT6893 layout (DRAM base, GICD `0x0c000000`, GICR `0x0c040000`, timer 13 MHz, INTID 27, FB `0x7E020000`, UFS `0x11270000`, 8 CPUs with 4xA55 / 3xA78 / 1xA78 Ultra clocks and MPIDR `core << 8`). Retains compatibility aliases for XNU drivers.
+  - `tools/mkpayload.py`: Uses `AGATEXNU` magic.
+- **Next steps for next agent**:
+  - Boot `shim/out/shim-boot.img` on target device (`fastboot boot shim/out/shim-boot.img`) to verify screen markers, MMU, PSCI, GIC, and UFS read-only probe.
+  - Adapt XNU kernel patches for early framebuffer mapping (`0010` / `0012` hardcoded `0x9c000000` -> `0x7E020000`) and trigger kernel build on CI via `gh workflow run xnu.yml`.
+
+---
+
+### >>> Prior Upstream Sweet Notes (for reference) <<<
 
 **STATE at end of 2026-10-18 (evening):**
 - On the phone: userdata = **image v15** (`/run/media/dipa/android/ios-sweet-ipsw/ios16-root-20H392-v15.img/.simg`; = v14 + `/private/var/preferences/SystemConfiguration/preferences.plist` with one network service "USB Ethernet": Interface DeviceName ue0 Type Ethernet, IPv4 Manual 192.168.7.2/24 router 192.168.7.1, DNS 1.1.1.1 8.8.8.8, set "Automatic" as CurrentSet). Fallback image v14 (v12/v13 deleted).

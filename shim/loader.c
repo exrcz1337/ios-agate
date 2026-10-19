@@ -67,11 +67,16 @@ static void zero64(uintptr_t dst, uint64_t n)
 
 static int magic_ok(const char *m)
 {
-	static const char want[] = "SWEETXNU";
-	for (int i = 0; i < 8; i++)
-		if (m[i] != want[i])
-			return 0;
-	return 1;
+	static const char want1[] = "AGATEXNU";
+	static const char want2[] = "SWEETXNU";
+	int ok1 = 1, ok2 = 1;
+	for (int i = 0; i < 8; i++) {
+		if (m[i] != want1[i])
+			ok1 = 0;
+		if (m[i] != want2[i])
+			ok2 = 0;
+	}
+	return ok1 || ok2;
 }
 
 typedef void (*xnu_entry_t)(uint64_t boot_args_pa);
@@ -87,7 +92,7 @@ const char *loader_boot(uintptr_t dtb)
 
 	const struct payload *p = (const struct payload *)rd_start;
 	if (!magic_ok(p->magic))
-		return "no SWEETXNU payload";
+		return "no AGATEXNU payload";
 	if (p->version != 1 || (p->adt_off & 7) || (rd_start & 7))
 		return "bad payload header";
 

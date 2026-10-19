@@ -1,0 +1,18 @@
+kernel_size: 13377345
+kernel_addr: 0x40080000
+ramdisk_size: 21906428
+ramdisk_addr: 0x51100000
+second_size: 0
+tags_addr: 0x47c80000
+page_size: 2048
+header_version: 2
+os_version: 0x18000197
+name: 
+cmdline: bootopt=64S3,32N2,64N2 buildvariant=user
+header_size: 1660
+dtb_addr: 0x47c80000
+kernel_offset: 2048
+ramdisk_offset: 13379584
+second_offset: 35287040
+recovery_dtbo_offset: 35287040
+dtb_offset: 35287040
