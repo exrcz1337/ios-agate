@@ -23,8 +23,8 @@
   - `shim.c`: GICD set to `0x0c000000UL`, GICR to `0x0c040000UL` (size `0x200000UL`), VTIMER_INTID 27, PTIMER_INTID 30. Standard PSCI reset enabled. Timer calculations adjusted to 13 MHz.
   - `ufs.c`: UFS base set to `0x11270000UL`, timer delays set to 13 MHz, custom `str_eq` implemented to prevent external library calls.
   - `loader.c`: Accepts `AGATEXNU` and `SWEETXNU` payload magic.
-  - `build.sh`: Toolchain auto-detects `aarch64-linux-gnu-gcc` or `clang`/`ld.lld` with `-fpie`. Generates boot.img v2 with agate parameters (`--base 0x40000000 --kernel_offset 0x80000 --ramdisk_offset 0x11100000 --tags_offset 0x07c80000 --dtb_offset 0x07c80000 --pagesize 2048`).
-  - Built and verified: `shim/out/Image` and `shim/out/shim-boot.img`.
+  - `build.sh`: Toolchain auto-detects `aarch64-linux-gnu-gcc` or `clang`/`ld.lld` with `-fpie`. Kernel compressed with gzip (`Image.gz`) as required by MediaTek LK decompressor (`decompress_kernel`). `start.S` text_offset set to `0x80000`. Generates boot.img v2 with agate parameters (`--base 0x40000000 --kernel_offset 0x80000 --ramdisk_offset 0x11100000 --tags_offset 0x07c80000 --dtb_offset 0x07c80000 --pagesize 2048 --os_version 0x18000197`).
+  - Built and verified: `shim/out/Image`, `shim/out/Image.gz`, and `shim/out/shim-boot.img`.
 - **Tools adaptation (`tools/`)**:
   - `tools/mkbootimg.py`: Created standalone boot image v2 generator.
   - `tools/mkadt.py`: Adapted for agate MT6893 layout (DRAM base, GICD `0x0c000000`, GICR `0x0c040000`, timer 13 MHz, INTID 27, FB `0x7E020000`, UFS `0x11270000`, 8 CPUs with 4xA55 / 3xA78 / 1xA78 Ultra clocks and MPIDR `core << 8`). Retains compatibility aliases for XNU drivers.

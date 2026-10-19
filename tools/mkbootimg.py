@@ -22,7 +22,7 @@ def main():
     p.add_argument('--dtb_offset', type=parse_int, default=0)
     p.add_argument('--pagesize', type=parse_int, default=2048)
     p.add_argument('--header_version', type=parse_int, default=2)
-    p.add_argument('--os_version', default='0')
+    p.add_argument('--os_version', type=parse_int, default=0x18000197)
     p.add_argument('--os_patch_level', default='')
     p.add_argument('-o', '--output', required=True)
     a = p.parse_args()
@@ -43,7 +43,7 @@ def main():
                      len(r_data), r_addr,
                      0, 0,
                      t_addr, a.pagesize,
-                     a.header_version, 0)
+                     a.header_version, a.os_version)
     cmd = a.cmdline.encode()
     hdr[64:64+min(len(cmd), 512)] = cmd[:512]
     if len(cmd) > 512:
@@ -54,6 +54,14 @@ def main():
     h.update(struct.pack('<I', len(k_data)))
     h.update(r_data)
     h.update(struct.pack('<I', len(r_data)))
+    h.update(b'')
+    h.update(struct.pack('<I', 0))
+    if a.header_version >= 1:
+        h.update(b'')
+        h.update(struct.pack('<I', 0))
+    if a.header_version >= 2:
+        h.update(d_data)
+        h.update(struct.pack('<I', len(d_data)))
     hdr[576:576+20] = h.digest()
 
     if a.header_version >= 1:

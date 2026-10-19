@@ -45,6 +45,7 @@ fi
 $OBJCOPY -O binary out/shim.elf out/Image
 size=$($NM out/shim.elf | awk '$3=="_end"{print strtonum("0x"$1)}')
 truncate -s "$size" out/Image
+gzip -n -9 -c out/Image > out/Image.gz
 
 if [ -n "${1:-}" ]; then
 	cp "$1" out/ramdisk.bin
@@ -64,10 +65,11 @@ if [ -n "$DTB" ]; then
 	DTB_ARG="--dtb $DTB"
 fi
 
-$MKBOOTIMG --header_version 2 --kernel out/Image --ramdisk out/ramdisk.bin \
+$MKBOOTIMG --header_version 2 --kernel out/Image.gz --ramdisk out/ramdisk.bin \
 	$DTB_ARG --base 0x40000000 --kernel_offset 0x80000 --ramdisk_offset 0x11100000 \
 	--tags_offset 0x07c80000 --dtb_offset 0x07c80000 --pagesize 2048 \
+	--os_version 0x18000197 \
 	--cmdline "console=null" -o out/shim-boot.img
 
 gcc -O1 -Wall -o out/host_test console.c host_test.c && ./out/host_test
-ls -l out/Image out/shim-boot.img
+ls -l out/Image out/Image.gz out/shim-boot.img
