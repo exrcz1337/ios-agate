@@ -69,7 +69,7 @@ $MKBOOTIMG --header_version 2 --kernel out/Image.gz --ramdisk out/ramdisk.bin \
 	$DTB_ARG --base 0x40000000 --kernel_offset 0x80000 --ramdisk_offset 0x11100000 \
 	--tags_offset 0x07c80000 --dtb_offset 0x07c80000 --pagesize 2048 \
 	--os_version 0x18000197 \
-	--cmdline "console=null" -o out/shim-boot.img
+	--cmdline "bootopt=64S3,32N2,64N2 buildvariant=user" -o out/shim-boot.img
 
 gcc -O1 -Wall -o out/host_test console.c host_test.c && ./out/host_test
 ls -l out/Image out/Image.gz out/shim-boot.img
