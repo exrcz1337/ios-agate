@@ -20,30 +20,58 @@ _head:
 	.globl _start
 _start:
 	msr	daifset, #0xf
-	mov	x19, x0			/* DTB pointer from ABL */
+	mrs	x1, CurrentEL
+	cmp	x1, #0x8
+	b.ne	1f
+	mov	x1, #(1 << 31)
+	msr	hcr_el2, x1
+	mrs	x1, cnthctl_el2
+	orr	x1, x1, #3
+	msr	cnthctl_el2, x1
+	msr	cntvoff_el2, xzr
+	msr	cptr_el2, xzr
+	mov	x1, #0x3c5
+	msr	spsr_el2, x1
+	adr	x1, 1f
+	msr	elr_el2, x1
+	eret
+1:	mov	x19, x0
 	msr	spsel, #1
 	adr	x1, _stack_top
 	mov	sp, x1
 	adr	x1, vectors
 	msr	vbar_el1, x1
 	isb
-	/* zero .bss */
 	adr	x1, _bss_start
 	adr	x2, _bss_end
-1:	cmp	x1, x2
-	b.hs	2f
+2:	cmp	x1, x2
+	b.hs	3f
 	str	xzr, [x1], #8
-	b	1b
-2:	mov	x0, x19
+	b	2b
+3:	mov	x0, x19
 	bl	shim_main
-3:	wfe
-	b	3b
+4:	wfe
+	b	4b
 
-/* PSCI CPU_ON target. x0 = context id = cpu index (1..7). */
 	.globl secondary_entry
 secondary_entry:
 	msr	daifset, #0xf
-	msr	spsel, #1
+	mrs	x1, CurrentEL
+	cmp	x1, #0x8
+	b.ne	1f
+	mov	x1, #(1 << 31)
+	msr	hcr_el2, x1
+	mrs	x1, cnthctl_el2
+	orr	x1, x1, #3
+	msr	cnthctl_el2, x1
+	msr	cntvoff_el2, xzr
+	msr	cptr_el2, xzr
+	mov	x1, #0x3c5
+	msr	spsr_el2, x1
+	adr	x1, 1f
+	msr	elr_el2, x1
+	eret
+1:	msr	spsel, #1
 	adr	x1, _sec_stacks
 	add	x1, x1, x0, lsl #12
 	add	x1, x1, #0x1000
@@ -52,8 +80,8 @@ secondary_entry:
 	msr	vbar_el1, x1
 	isb
 	bl	secondary_main
-4:	wfe
-	b	4b
+2:	wfe
+	b	2b
 
 /*
  * Exception vectors. Each slot stashes x29/x30, loads its slot number

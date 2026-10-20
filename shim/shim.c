@@ -11,6 +11,26 @@
 #include "mmu.h"
 #include "loader.h"
 #include "ufs.h"
+#include "fdt.h"
+
+#define WDT_BASE		0x10007000UL
+#define WDT_MODE		0x00
+#define WDT_MODE_KEY		0x22000000U
+#define WDT_MODE_EN		(1U << 0)
+#define WDT_RST			0x08
+#define WDT_RST_RELOAD		0x1971U
+
+static void wdt_disable(void)
+{
+	volatile uint32_t *mode = (volatile uint32_t *)(WDT_BASE + WDT_MODE);
+	*mode = (*mode & ~WDT_MODE_EN) | WDT_MODE_KEY;
+}
+
+static void wdt_pet(void)
+{
+	volatile uint32_t *rst = (volatile uint32_t *)(WDT_BASE + WDT_RST);
+	*rst = WDT_RST_RELOAD;
+}
 
 #define GICD_BASE		0x0c000000UL
 #define GICR_BASE		0x0c040000UL
@@ -94,7 +114,7 @@ static void delay_ms(unsigned ms)
 {
 	uint64_t end = now() + rsr("cntfrq_el0") / 1000 * ms;
 	while (now() < end)
-		;
+		wdt_pet();
 }
 
 static void __attribute__((noreturn)) reset(unsigned after_s)
@@ -366,6 +386,12 @@ static uint32_t to_us(uint64_t ticks)
 void shim_main(uint64_t dtb)
 {
 	struct mmu_info mi;
+	uint64_t fb = 0;
+
+	wdt_disable();
+
+	if (fdt_chosen_u64(dtb, "atag,videolfb-fb_base_l", &fb) && fb != 0)
+		con_fb = (volatile uint32_t *)fb;
 
 	stage = "loader";
 	con_clear(RED);
