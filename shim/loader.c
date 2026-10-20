@@ -14,6 +14,24 @@
 
 #define BOOT_LINE_LENGTH	608
 #define PAGE_16K		0x4000UL
+#define PSCI_CPU_ON		0xc4000003UL
+
+extern char dsi_flush_loop[];
+
+static uint64_t smc(uint64_t fn, uint64_t a1, uint64_t a2, uint64_t a3)
+{
+	register uint64_t x0 __asm__("x0") = fn;
+	register uint64_t x1 __asm__("x1") = a1;
+	register uint64_t x2 __asm__("x2") = a2;
+	register uint64_t x3 __asm__("x3") = a3;
+
+	__asm__ volatile("smc #0"
+			 : "+r"(x0), "+r"(x1), "+r"(x2), "+r"(x3)
+			 :
+			 : "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11",
+			   "x12", "x13", "x14", "x15", "x16", "x17", "memory");
+	return x0;
+}
 
 struct payload_seg {
 	uint64_t vmaddr, vmsize, file_off, file_size;
@@ -142,10 +160,11 @@ const char *loader_boot(uintptr_t dtb)
 	con_hex2("BOOTARG", "pa=", ba_pa, "top=", top);
 
 	uintptr_t entry_pa = p->entry_va + pa_of_va_base;
+	uint64_t cpu1_ret = smc(PSCI_CPU_ON, 0x100, (uintptr_t)dsi_flush_loop, 0);
+	con_hex("CPU1", cpu1_ret);
 	con_hex("JUMP", entry_pa);
 	con_str("XNU", "jumping (fbcon clears screen)");
 
-	/* Everything was written with the MMU and caches off; drop any stale I-cache lines too. */
 	__asm__ volatile("dsb sy; ic iallu; dsb sy; isb" ::: "memory");
 	((xnu_entry_t)entry_pa)(ba_pa);
 	return "xnu returned";

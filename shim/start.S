@@ -83,6 +83,39 @@ secondary_entry:
 2:	wfe
 	b	2b
 
+	.globl dsi_flush_loop
+dsi_flush_loop:
+	msr	daifset, #0xf
+	mrs	x1, CurrentEL
+	cmp	x1, #0x8
+	b.ne	1f
+	mov	x1, #(1 << 31)
+	msr	hcr_el2, x1
+	mrs	x1, cnthctl_el2
+	orr	x1, x1, #3
+	msr	cnthctl_el2, x1
+	msr	cntvoff_el2, xzr
+	msr	cptr_el2, xzr
+	mov	x1, #0x3c5
+	msr	spsr_el2, x1
+	adr	x1, 1f
+	msr	elr_el2, x1
+	eret
+1:	movz	x3, #0x7020
+	movk	x3, #0x1411, lsl #16
+	movz	x4, #0xe000
+	movk	x4, #0x1400, lsl #16
+2:	dsb	sy
+	mov	w1, #1
+	str	w1, [x3]
+	str	wzr, [x4]
+	str	w1, [x4]
+	dsb	sy
+	mov	x2, #0x400000
+3:	subs	x2, x2, #1
+	b.ne	3b
+	b	2b
+
 /*
  * Exception vectors. Each slot stashes x29/x30, loads its slot number
  * and jumps to the common path, which saves x0-x28 and calls
