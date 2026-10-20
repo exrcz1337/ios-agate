@@ -163,12 +163,15 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 		return;
 	}
 	con_clear(BLUE);
-	switch (slot & 3) {
-	case 0: con_str("PANIC", "SYNC"); break;
-	case 1: con_str("PANIC", "IRQ"); break;
-	case 2: con_str("PANIC", "FIQ"); break;
-	default: con_str("PANIC", "SERROR"); break;
-	}
+	int s = slot & 3;
+	if (s == 0)
+		con_str("PANIC", "SYNC");
+	else if (s == 1)
+		con_str("PANIC", "IRQ");
+	else if (s == 2)
+		con_str("PANIC", "FIQ");
+	else
+		con_str("PANIC", "SERROR");
 	con_hex2("SLOT", "n=", slot, "cpu=", rsr("mpidr_el1"));
 	con_str("STAGE", stage);
 	con_hex("ESR", rsr("esr_el1"));

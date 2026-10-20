@@ -2,27 +2,28 @@
 
 ## Agent handoff / active work (2026-10-20, latest)
 
-### >>> UPDATE 2026-10-20: Secondary Core Background Flusher & DSI Command Mode Solution <<<
+### >>> UPDATE 2026-10-20: Secondary Core Background Flusher & GOT Elimination Fix <<<
 
 **STATE at 2026-10-20 (late):**
-- **Root Cause Analysis for Frozen Screen:**
-  - Phone successfully boots custom shim and was stopping on `XNU jumping (fbcon clears screen)`.
-  - Xiaomi 11T (`agate`) AMOLED panel is **DSI Command Mode (`k11t_42_02_0a_dsc_cmd`)**, which has internal GRAM and **ONLY** updates when triggered by hardware kick:
-    - `*(volatile uint32_t *)0x14117020 = 1;` (`MUTEX0_EN`)
-    - `*(volatile uint32_t *)0x1400e000 = 0; *(volatile uint32_t *)0x1400e000 = 1;` (`DSI0_START`)
-  - On Qualcomm `sweet`, panel was Video Mode (continuous DRAM scanout). On `agate`, XNU writes to DRAM framebuffer (`0x7E020000`), but never issues DSI flush kicks, leaving the screen displaying the last frame from shim.
-- **Implemented Solution (Secondary Core Background Flusher):**
-  - Added `dsi_flush_loop` in `shim/start.S`: Runs with MMU off at EL1, enters an infinite loop triggering `MUTEX0_EN` and `DSI0_START` with a ~16-30ms cycle delay loop (`subs x2, #1; b.ne`).
-  - Added PSCI CPU ON launch in `shim/loader.c`: Before jumping to XNU, CPU 0 starts CPU 1 (target MPIDR `0x100`) via `smc(PSCI_CPU_ON, 0x100, (uintptr_t)dsi_flush_loop, 0)`.
-  - The boot argument specifies `cpus=1`, meaning XNU exclusively uses CPU 0 and never touches CPU 1, keeping CPU 1 dedicated to flushing the display buffer at ~30-60 Hz in the background.
-  - Whatever CPU 0 (XNU, `start.s`, `arm_init`, `sweet_early`, panics, `fbcon`) writes to `0x7E020000` is now continuously transferred to the AMOLED display.
-- **Artifacts built & signed:**
-  - Payload packed: `tools/mkpayload.py xnu/out/kernel.development.sweet shim/out/agate.adt shim/out/payload.bin --cmdline "debug=0xc serial=3 cpus=1 keepsyms=1 -enable_kprintf_spam"`
-  - Shim image built and signed with AVB: `shim/out/shim-boot.img` (134 MB).
-  - Also mirrored to `c:\Users\exerczz1\Documents\ios-agate\shim\out\shim-boot.img`.
-- **How to test / next steps:**
-  - Flash boot: `fastboot flash boot shim/out/shim-boot.img` (or `fastboot boot shim/out/shim-boot.img`).
-  - Screen will display `CPU1 0000000000000000`, `JUMP 000000004148b488`, followed immediately by XNU Stage 0 / `arm_init` stage bands and `SweetEarlyConsole` output.
+- **CRITICAL BUG IDENTIFIED FROM DEVICE PHOTO:**
+  - On-screen log showed:
+    `FB addr=00000000 stride=00000000`
+    `DISP w=00000000 h=00000000`
+    `FMT bpp=00000000 bswap=00000000`
+  - Clang with `-fpie` generated a `.got` (Global Offset Table) with link-time 0-based pointers (`0x4518`, `0x8f0`).
+  - Because bare-metal firmware runs without a dynamic linker (`ld.so`), reading external symbols through GOT loaded pointers to address `0x00004518` (which is zero in DRAM).
+  - This caused TWO fatal issues:
+    1. `(uintptr_t)dsi_flush_loop` evaluated to `0x8f0` instead of `0x400808f0` -> CPU 1 jumped to `0x8f0` and crashed.
+    2. `ba->Video` had `v_baseAddr=0`, `v_rowBytes=0`, `v_width=0` -> XNU faulted on NULL dereference during `fbcon_init`.
+- **FIX IMPLEMENTED:**
+  - Switched `build.sh` from `PIC_FLAG="-fpie"` to `PIC_FLAG="-fno-pic"` with `-fno-jump-tables`.
+  - Replaced `switch (slot & 3)` in `shim.c` with `if-else` to prevent jump table creation.
+  - Verified disassembly: `.got` completely eliminated!
+  - `dsi_flush_loop` is now computed via `adr x2, ...` to the true physical address `0x400808f0`.
+  - `con_fb`, `con_stride`, `con_w`, `con_h` are loaded directly via PC-relative `adrp` instructions.
+- **Artifacts:**
+  - Signed image rebuilt: `shim/out/shim-boot.img` (128 MB / 134217728 bytes).
+  - Mirrored to `c:\Users\exerczz1\Documents\ios-agate\shim\out\shim-boot.img`.
 
 ### >>> UPDATE 2026-10-20: Agate Adaptation Milestone 2 (XNU Kernel & FB Adaptation) <<<
 

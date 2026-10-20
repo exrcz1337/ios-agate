@@ -17,7 +17,7 @@ else
 	NM=llvm-nm
 	LD=ld.lld
 	LDFLAGS="-T shim.ld --build-id=none -N"
-	PIC_FLAG="-fpie"
+	PIC_FLAG="-fno-pic"
 fi
 
 if command -v mkbootimg >/dev/null 2>&1; then
@@ -26,7 +26,7 @@ else
 	MKBOOTIMG="python3 ../tools/mkbootimg.py"
 fi
 
-CFLAGS="-O2 -ffreestanding -nostdlib $PIC_FLAG -mgeneral-regs-only -mstrict-align -fno-stack-protector -Wall -Wextra"
+CFLAGS="-O2 -ffreestanding -nostdlib $PIC_FLAG -fno-jump-tables -mgeneral-regs-only -mstrict-align -fno-stack-protector -Wall -Wextra"
 mkdir -p out
 
 for f in start.S shim.c console.c mmu.c fdt.c loader.c ufs.c; do
