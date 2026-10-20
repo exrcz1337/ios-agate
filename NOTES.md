@@ -2,6 +2,19 @@
 
 ## Agent handoff / active work (2026-10-19, latest)
 
+### >>> UPDATE 2026-10-20: Agate Adaptation Milestone 2 (XNU Kernel & FB Adaptation) <<<
+
+**STATE at 2026-10-20:**
+- Device verified booting custom shim and executing EL1 drop, WDT disable, DSI Command Mode flush, dynamic OVL BPP/stride detection and log display on phone screen.
+- Adapted core XNU patches for MediaTek MT6893 (`agate`):
+  - `0003-sweet-framebuffer-serial-console.patch`: Framebuffer stride check relaxed from `>= 4 * width` to `>= 2 * width` to support 24bpp RGB888 and 16bpp formats.
+  - `0004-sweet-machine-config.patch`: Set default `SWEET_VTIMER_INTID` to 27 (PPI 11 on MediaTek GICv3).
+  - `0010-sweet-early-framebuffer-debug.patch`: Remapped bootstrap early framebuffer from `0x9c000000` to `0x7E020000` (and `0x7E000000` 32MB L2 block mapping).
+  - `0012-sweet-keep-debug-console-after-ttbr0.patch`: Remapped kernel VA framebuffer alias to `0x7E000000` block and relocated early console to `SWEET_EARLY_FB_VA + 0x20000` (`0x7E020000`).
+  - `0046-sweet-iosurface-iomfb.patch`: Relaxed `rowBytes` validation to `>= 2 * width`.
+  - `tools/mkadt.py`: Added `qcom,kryo470` to CPU compatible property for seamless `SweetCPU` driver matching.
+- Next step: Run CI kernel build via `gh workflow run xnu.yml` to produce the agate XNU kernel.
+
 ### >>> UPDATE 2026-10-19: Agate Adaptation Milestone 1 (Shim & Tools) <<<
 
 **STATE at 2026-10-19:**

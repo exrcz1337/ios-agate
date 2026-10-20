@@ -1130,7 +1130,7 @@
 +	fWidth = (uint32_t)video.v_width;
 +	fHeight = (uint32_t)video.v_height;
 +	fRowBytes = (uint32_t)video.v_rowBytes;
-+	if (fPhys == 0 || fWidth == 0 || fHeight == 0 || fRowBytes < fWidth * 4) {
++	if (fPhys == 0 || fWidth == 0 || fHeight == 0 || fRowBytes < fWidth * 2) {
 +		IOLog("SWEET FB: no boot framebuffer\n");
 +		return false;
 +	}

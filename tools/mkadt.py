@@ -76,13 +76,13 @@ def build(seed=None, qemu=False, highmem=False):
     cpu_nodes = []
     for core in range(1 if qemu else 8):
         if core < 4:
-            comp = cstr('arm,cortex-a55') + cstr('ARM,v8')
+            comp = cstr('arm,cortex-a55') + cstr('qcom,kryo470') + cstr('ARM,v8')
             clk = 2000000000
         elif core < 7:
-            comp = cstr('arm,cortex-a78') + cstr('ARM,v8')
+            comp = cstr('arm,cortex-a78') + cstr('qcom,kryo470') + cstr('ARM,v8')
             clk = 2600000000
         else:
-            comp = cstr('arm,cortex-a78') + cstr('ARM,v8')
+            comp = cstr('arm,cortex-a78') + cstr('qcom,kryo470') + cstr('ARM,v8')
             clk = 3000000000
         cpu_nodes.append(node(f'cpu{core}', [
             ph(),
