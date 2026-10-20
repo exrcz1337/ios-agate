@@ -18,9 +18,8 @@ static int row;
 void con_flush(void)
 {
 #ifndef __x86_64__
+	__asm__ volatile("dsb sy" ::: "memory");
 	*(volatile uint32_t *)0x14117020 = 1;
-	*(volatile uint32_t *)0x1400e000 = 0;
-	*(volatile uint32_t *)0x1400e000 = 1;
 #endif
 }
 

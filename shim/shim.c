@@ -113,10 +113,8 @@ static uint64_t now(void)
 static void delay_ms(unsigned ms)
 {
 	uint64_t end = now() + rsr("cntfrq_el0") / 1000 * ms;
-	while (now() < end) {
+	while (now() < end)
 		wdt_pet();
-		con_flush();
-	}
 }
 
 static void __attribute__((noreturn)) reset(unsigned after_s)
@@ -392,7 +390,17 @@ void shim_main(uint64_t dtb)
 
 	wdt_disable();
 
-	uint32_t ovl_fb = *(volatile uint32_t *)0x14000f40;
+	uint32_t src_on = *(volatile uint32_t *)0x1400002c;
+	uint32_t ovl_fb = 0;
+	if (src_on & 1)
+		ovl_fb = *(volatile uint32_t *)0x14000f40;
+	else if (src_on & 2)
+		ovl_fb = *(volatile uint32_t *)0x14000f60;
+	else if (src_on & 4)
+		ovl_fb = *(volatile uint32_t *)0x14000f80;
+	else if (src_on & 8)
+		ovl_fb = *(volatile uint32_t *)0x14000fa0;
+
 	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
 	if (ovl_fb >= 0x40000000 && ovl_fb < 0x90000000)
 		con_fb = (volatile uint32_t *)(uintptr_t)ovl_fb;
@@ -406,6 +414,7 @@ void shim_main(uint64_t dtb)
 	con_str("SHIM", "hi from exerczz1 <3");
 	con_str("SHIM", "agate milestone 4: xnu loader");
 	con_hex2("FB", "addr=", (uint32_t)(uintptr_t)con_fb, "ovl=", ovl_fb);
+	con_hex2("OVL", "src_on=", src_on, "rdma=", rdma_fb);
 	con_skip();
 	const char *why = loader_boot(dtb);
 	con_str("LOADER", why);
