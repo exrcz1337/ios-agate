@@ -113,8 +113,15 @@ static uint64_t now(void)
 static void delay_ms(unsigned ms)
 {
 	uint64_t end = now() + rsr("cntfrq_el0") / 1000 * ms;
-	while (now() < end)
+	uint64_t last = 0;
+	while (now() < end) {
 		wdt_pet();
+		uint64_t t = now();
+		if (t - last > 1300000) {
+			con_flush();
+			last = t;
+		}
+	}
 }
 
 static void __attribute__((noreturn)) reset(unsigned after_s)
@@ -401,6 +408,10 @@ void shim_main(uint64_t dtb)
 	else if (src_on & 8)
 		ovl_fb = *(volatile uint32_t *)0x14000fa0;
 
+	uint32_t pitch = *(volatile uint32_t *)0x14000044 & 0xffff;
+	if (pitch >= 1080 * 4 && pitch <= 8192)
+		con_stride = pitch;
+
 	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
 	if (ovl_fb >= 0x40000000 && ovl_fb < 0x90000000)
 		con_fb = (volatile uint32_t *)(uintptr_t)ovl_fb;
@@ -408,6 +419,8 @@ void shim_main(uint64_t dtb)
 		con_fb = (volatile uint32_t *)(uintptr_t)rdma_fb;
 	else if (fdt_chosen_u64(dtb, "atag,videolfb-fb_base_l", &fb) && fb != 0)
 		con_fb = (volatile uint32_t *)fb;
+	else
+		con_fb = (volatile uint32_t *)0x7E020000UL;
 
 	stage = "loader";
 	con_clear(RED);

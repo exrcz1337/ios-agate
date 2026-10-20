@@ -13,6 +13,7 @@
 #define GREEN	0xff00ff00U
 
 extern volatile uint32_t *con_fb;
+extern uint32_t con_stride;
 
 void con_clear(uint32_t bg);
 void con_flush(void);
