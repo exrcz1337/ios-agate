@@ -71,5 +71,26 @@ $MKBOOTIMG --header_version 2 --kernel out/Image.gz --ramdisk out/ramdisk.bin \
 	--os_version 0x18000197 \
 	--cmdline "bootopt=64S3,32N2,64N2 buildvariant=user" -o out/shim-boot.img
 
+AVBTOOL=""
+if command -v avbtool >/dev/null 2>&1; then
+	AVBTOOL=avbtool
+elif [ -x /home/exerczz1/galegki/prebuilts/kernel-build-tools/linux-x86/bin/avbtool ]; then
+	AVBTOOL=/home/exerczz1/galegki/prebuilts/kernel-build-tools/linux-x86/bin/avbtool
+fi
+
+AVBKEY=""
+if [ -f /home/exerczz1/galegki/prebuilts/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem ]; then
+	AVBKEY=/home/exerczz1/galegki/prebuilts/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
+fi
+
+if [ -n "$AVBTOOL" ] && [ -n "$AVBKEY" ]; then
+	$AVBTOOL add_hash_footer \
+		--image out/shim-boot.img \
+		--partition_size 134217728 \
+		--partition_name boot \
+		--algorithm SHA256_RSA2048 \
+		--key "$AVBKEY"
+fi
+
 gcc -O1 -Wall -o out/host_test console.c host_test.c && ./out/host_test
 ls -l out/Image out/Image.gz out/shim-boot.img
