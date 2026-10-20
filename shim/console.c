@@ -15,6 +15,15 @@ volatile uint32_t *con_fb = (volatile uint32_t *)FB_BASE;
 static uint32_t con_bg;
 static int row;
 
+void con_flush(void)
+{
+#ifndef __x86_64__
+	*(volatile uint32_t *)0x14117020 = 1;
+	*(volatile uint32_t *)0x1400e000 = 0;
+	*(volatile uint32_t *)0x1400e000 = 1;
+#endif
+}
+
 void con_clear(uint32_t bg)
 {
 	for (int y = 0; y < FB_H; y++) {
@@ -24,6 +33,7 @@ void con_clear(uint32_t bg)
 	}
 	con_bg = bg;
 	row = 0;
+	con_flush();
 }
 
 static void put_char(int col, char ch, uint32_t fg)
@@ -71,6 +81,7 @@ void con_str(const char *label, const char *s)
 	put_str(0, label, YELLOW);
 	put_str(LABEL_COLS, s, WHITE);
 	row++;
+	con_flush();
 }
 
 void con_hex(const char *label, uint64_t v)
@@ -94,4 +105,5 @@ void con_hex2(const char *label, const char *a, uint32_t va, const char *b, uint
 		put_str(col, buf, WHITE);
 	}
 	row++;
+	con_flush();
 }

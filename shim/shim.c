@@ -113,8 +113,10 @@ static uint64_t now(void)
 static void delay_ms(unsigned ms)
 {
 	uint64_t end = now() + rsr("cntfrq_el0") / 1000 * ms;
-	while (now() < end)
+	while (now() < end) {
 		wdt_pet();
+		con_flush();
+	}
 }
 
 static void __attribute__((noreturn)) reset(unsigned after_s)
@@ -390,12 +392,20 @@ void shim_main(uint64_t dtb)
 
 	wdt_disable();
 
-	if (fdt_chosen_u64(dtb, "atag,videolfb-fb_base_l", &fb) && fb != 0)
+	uint32_t ovl_fb = *(volatile uint32_t *)0x14000f40;
+	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
+	if (ovl_fb >= 0x40000000 && ovl_fb < 0x90000000)
+		con_fb = (volatile uint32_t *)(uintptr_t)ovl_fb;
+	else if (rdma_fb >= 0x40000000 && rdma_fb < 0x90000000)
+		con_fb = (volatile uint32_t *)(uintptr_t)rdma_fb;
+	else if (fdt_chosen_u64(dtb, "atag,videolfb-fb_base_l", &fb) && fb != 0)
 		con_fb = (volatile uint32_t *)fb;
 
 	stage = "loader";
 	con_clear(RED);
+	con_str("SHIM", "hi from exerczz1 <3");
 	con_str("SHIM", "agate milestone 4: xnu loader");
+	con_hex2("FB", "addr=", (uint32_t)(uintptr_t)con_fb, "ovl=", ovl_fb);
 	con_skip();
 	const char *why = loader_boot(dtb);
 	con_str("LOADER", why);
@@ -404,6 +414,7 @@ void shim_main(uint64_t dtb)
 	stage = "ufs";
 	test_ufs();
 	con_skip();
+	con_str("SHIM", "hi from exerczz1 <3");
 	con_str("UFS", "probe done, reset in ~3 min");
 	delay_ms(180000);
 	reset(20);
