@@ -396,38 +396,18 @@ void shim_main(uint64_t dtb)
 	uint64_t fb = 0;
 
 	wdt_disable();
+	con_init();
 
-	uint32_t src_on = *(volatile uint32_t *)0x1400002c;
-	uint32_t ovl_fb = 0;
-	if (src_on & 1)
-		ovl_fb = *(volatile uint32_t *)0x14000f40;
-	else if (src_on & 2)
-		ovl_fb = *(volatile uint32_t *)0x14000f60;
-	else if (src_on & 4)
-		ovl_fb = *(volatile uint32_t *)0x14000f80;
-	else if (src_on & 8)
-		ovl_fb = *(volatile uint32_t *)0x14000fa0;
-
-	uint32_t pitch = *(volatile uint32_t *)0x14000044 & 0xffff;
-	if (pitch >= 1080 * 4 && pitch <= 8192)
-		con_stride = pitch;
-
-	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
-	if (ovl_fb >= 0x40000000 && ovl_fb < 0x90000000)
-		con_fb = (volatile uint32_t *)(uintptr_t)ovl_fb;
-	else if (rdma_fb >= 0x40000000 && rdma_fb < 0x90000000)
-		con_fb = (volatile uint32_t *)(uintptr_t)rdma_fb;
-	else if (fdt_chosen_u64(dtb, "atag,videolfb-fb_base_l", &fb) && fb != 0)
-		con_fb = (volatile uint32_t *)fb;
-	else
-		con_fb = (volatile uint32_t *)0x7E020000UL;
+	if (fdt_chosen_u64(dtb, "atag,videolfb-fb_base_l", &fb) && fb != 0 && con_fb == (volatile void *)FB_BASE)
+		con_fb = (volatile void *)fb;
 
 	stage = "loader";
 	con_clear(RED);
 	con_str("SHIM", "hi from exerczz1 <3");
 	con_str("SHIM", "agate milestone 4: xnu loader");
-	con_hex2("FB", "addr=", (uint32_t)(uintptr_t)con_fb, "ovl=", ovl_fb);
-	con_hex2("OVL", "src_on=", src_on, "rdma=", rdma_fb);
+	con_hex2("FB", "addr=", (uint32_t)(uintptr_t)con_fb, "stride=", con_stride);
+	con_hex2("DISP", "w=", con_w, "h=", con_h);
+	con_hex2("FMT", "bpp=", con_bpp, "bswap=", con_bswap);
 	con_skip();
 	const char *why = loader_boot(dtb);
 	con_str("LOADER", why);

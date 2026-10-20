@@ -1,7 +1,3 @@
-/*
- * Minimal text console on the ABL splash framebuffer. With the MMU off
- * every access is Device memory, so stay aligned (-mstrict-align).
- */
 #include "console.h"
 #include "font.h"
 
@@ -11,8 +7,13 @@
 #define MARGIN		24
 #define LABEL_COLS	8
 
-volatile uint32_t *con_fb = (volatile uint32_t *)FB_BASE;
+volatile void *con_fb = (volatile void *)FB_BASE;
 uint32_t con_stride = FB_STRIDE;
+uint32_t con_w = FB_W;
+uint32_t con_h = FB_H;
+uint32_t con_bpp = 4;
+uint32_t con_bswap = 0;
+
 static uint32_t con_bg;
 static int row;
 
@@ -26,15 +27,134 @@ void con_flush(void)
 #endif
 }
 
+void con_init(void)
+{
+#ifndef __x86_64__
+	uint32_t src_on = *(volatile uint32_t *)0x1400002c;
+	int layer = 0;
+	if (src_on & 1)
+		layer = 0;
+	else if (src_on & 2)
+		layer = 1;
+	else if (src_on & 4)
+		layer = 2;
+	else if (src_on & 8)
+		layer = 3;
+
+	uint32_t l_con = *(volatile uint32_t *)(0x14000030UL + (uintptr_t)layer * 0x20UL);
+	uint32_t l_size = *(volatile uint32_t *)(0x14000038UL + (uintptr_t)layer * 0x20UL);
+	uint32_t l_pitch = *(volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL) & 0xffff;
+	uint32_t l_addr = *(volatile uint32_t *)(0x14000f40UL + (uintptr_t)layer * 0x20UL);
+
+	uint32_t cfmt = (l_con >> 12) & 0xf;
+	uint32_t btsw = (l_con >> 24) & 1;
+	uint32_t rgbswap = (l_con >> 25) & 1;
+
+	if (cfmt == 0)
+		con_bpp = 2;
+	else if (cfmt == 1)
+		con_bpp = 3;
+	else
+		con_bpp = 4;
+
+	con_bswap = (btsw == 0) ^ rgbswap;
+	if (cfmt == 3)
+		con_bswap ^= 1;
+
+	uint32_t w = l_size & 0xfff;
+	uint32_t h = (l_size >> 16) & 0xfff;
+	if (w >= 320 && w <= 4096)
+		con_w = w;
+	else
+		con_w = FB_W;
+
+	if (h >= 480 && h <= 4096)
+		con_h = h;
+	else
+		con_h = FB_H;
+
+	if (l_pitch >= con_w * con_bpp && l_pitch <= 16384)
+		con_stride = l_pitch;
+	else
+		con_stride = con_w * con_bpp;
+
+	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
+	if (l_addr >= 0x40000000 && l_addr < 0xc0000000)
+		con_fb = (volatile void *)(uintptr_t)l_addr;
+	else if (rdma_fb >= 0x40000000 && rdma_fb < 0xc0000000)
+		con_fb = (volatile void *)(uintptr_t)rdma_fb;
+	else
+		con_fb = (volatile void *)FB_BASE;
+#endif
+}
+
+static inline void put_pixel(int x, int y, uint32_t c)
+{
+	if ((unsigned)x >= con_w || (unsigned)y >= con_h)
+		return;
+	uint8_t *p = (uint8_t *)con_fb + y * con_stride + x * con_bpp;
+	uint8_t r = (c >> 16) & 0xff;
+	uint8_t g = (c >> 8) & 0xff;
+	uint8_t b = c & 0xff;
+	if (con_bswap) {
+		uint8_t t = r;
+		r = b;
+		b = t;
+	}
+	if (con_bpp == 3) {
+		p[0] = r;
+		p[1] = g;
+		p[2] = b;
+	} else if (con_bpp == 4) {
+		p[0] = r;
+		p[1] = g;
+		p[2] = b;
+		p[3] = 0xff;
+	} else if (con_bpp == 2) {
+		uint16_t v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+		*(uint16_t *)p = v;
+	}
+}
+
 void con_clear(uint32_t bg)
 {
-	for (int y = 0; y < FB_H; y++) {
-		volatile uint32_t *line = con_fb + y * (con_stride / 4);
-		for (int x = 0; x < FB_W; x++)
-			line[x] = bg;
-	}
 	con_bg = bg;
 	row = 0;
+	uint8_t r = (bg >> 16) & 0xff;
+	uint8_t g = (bg >> 8) & 0xff;
+	uint8_t b = bg & 0xff;
+	if (con_bswap) {
+		uint8_t t = r;
+		r = b;
+		b = t;
+	}
+	if (con_bpp == 3) {
+		for (int y = 0; y < (int)con_h; y++) {
+			uint8_t *line = (uint8_t *)con_fb + y * con_stride;
+			for (int x = 0; x < (int)con_w; x++) {
+				line[x * 3 + 0] = r;
+				line[x * 3 + 1] = g;
+				line[x * 3 + 2] = b;
+			}
+		}
+	} else if (con_bpp == 4) {
+		for (int y = 0; y < (int)con_h; y++) {
+			uint8_t *line = (uint8_t *)con_fb + y * con_stride;
+			for (int x = 0; x < (int)con_w; x++) {
+				line[x * 4 + 0] = r;
+				line[x * 4 + 1] = g;
+				line[x * 4 + 2] = b;
+				line[x * 4 + 3] = 0xff;
+			}
+		}
+	} else if (con_bpp == 2) {
+		uint16_t v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+		for (int y = 0; y < (int)con_h; y++) {
+			uint16_t *line = (uint16_t *)((uint8_t *)con_fb + y * con_stride);
+			for (int x = 0; x < (int)con_w; x++)
+				line[x] = v;
+		}
+	}
 	con_flush();
 }
 
@@ -44,17 +164,14 @@ static void put_char(int col, char ch, uint32_t fg)
 		ch = '?';
 	const unsigned char *g = font8x16[ch - 0x20];
 	int x0 = MARGIN + col * CH_W, y0 = MARGIN + row * CH_H;
-	if (x0 + CH_W > FB_W || y0 + CH_H > FB_H)
+	if (x0 + CH_W > (int)con_w || y0 + CH_H > (int)con_h)
 		return;
 	for (int gy = 0; gy < 16; gy++)
 		for (int gx = 0; gx < 8; gx++) {
 			uint32_t c = (g[gy] & (0x80 >> gx)) ? fg : con_bg;
-			for (int sy = 0; sy < SCALE; sy++) {
-				volatile uint32_t *p = con_fb + (y0 + gy * SCALE + sy) * (con_stride / 4)
-						       + x0 + gx * SCALE;
+			for (int sy = 0; sy < SCALE; sy++)
 				for (int sx = 0; sx < SCALE; sx++)
-					p[sx] = c;
-			}
+					put_pixel(x0 + gx * SCALE + sx, y0 + gy * SCALE + sy, c);
 		}
 }
 
