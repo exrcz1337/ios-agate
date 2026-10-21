@@ -163,8 +163,6 @@ const char *loader_boot(uintptr_t dtb)
 	con_hex("JUMP", entry_pa);
 	con_str("XNU", "jumping (fbcon clears screen)");
 
-	smc(PSCI_CPU_ON, 0x100, (uintptr_t)dsi_flush_loop, 0);
-
 	__asm__ volatile("dsb sy; ic iallu; dsb sy; isb" ::: "memory");
 	((xnu_entry_t)entry_pa)(ba_pa);
 	return "xnu returned";
