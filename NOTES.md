@@ -2,6 +2,33 @@
 
 ## Agent handoff / active work (2026-10-21, latest)
 
+### >>> UPDATE 2026-10-21: Milestone 3 & Milestone 4 — GICv3 Timers, Packaging Pipeline & E2E Acceptance Verification <<<
+
+**STATE at 2026-10-21:**
+- Milestone 3 (GICv3 Interrupts & Timers) verified:
+  - Validated GICD base at `0x0c000000` (size `0x40000`) and GICR base at `0x0c040000` (size `0x200000`) in `tools/mkadt.py` and `shim/shim.c`.
+  - Configured virtual timer PPI 27 / INTID 27 in Non-Secure Group 1 (`SWEET_VTIMER_INTID = 27`), enabling XNU `rtclock` and scheduler tick handling via `sleh_irq`.
+  - Configured ADT `/cpus` node with `timebase-frequency = 13000000` (13.0 MHz `cntfrq_el0`).
+  - Empirical verification suite `tests/test_challenger_m3.py` passed with 7/7 tests green.
+- Milestone 4 (Final Build, Packaging & E2E Verification) executed and verified:
+  - Clean pipeline executed: `python3 tools/mkadt.py shim/out/agate.adt` -> `python3 tools/mkpayload.py ...` -> `cd shim && ./build.sh ../shim/out/payload.bin`.
+  - Binary integrity verified: `shim/out/shim.elf` contains 0 ABS64 relocations.
+  - Boot image verified: `shim/out/shim-boot.img` is exactly 134,217,728 bytes (128 MB) with valid AVB hash footer (`Footer version: 1.0`, `Algorithm: SHA256_RSA2048`, partition `boot`).
+  - Image synchronized to Windows workspace at `c:\Users\exerczz1\Documents\ios-agate\shim\out\shim-boot.img` with identical SHA256 checksum `4e9dfdeb0373e8bb658421051d63d7dfbae0e4ab962824f574c3c75201f2b8bc`.
+  - All test suites passing:
+    - `python3 tests/test_m2.py`: PASS
+    - `python3 tests/test_challenger_m1.py`: PASS
+    - `python3 tests/test_challenger_m2.py`: PASS
+    - `python3 tests/test_challenger_m3.py`: PASS
+    - `python3 tests/verify_m1.py`: PASS
+    - `gcc tests/verify_m1_c.c -o tests/verify_m1_c && ./tests/verify_m1_c`: PASS
+  - Acceptance criteria fully satisfied:
+    - 24-bit RGB888 stride 3240 early console synchronization.
+    - AMOLED Command Mode background flusher ~12.4 Hz pacing with race-free PSCI handoff.
+    - GICv3 distributor/redistributor and PPI 27 virtual timer in Non-Secure Group 1 at 13.0 MHz.
+    - Fastboot flash ready: `fastboot flash boot shim/out/shim-boot.img`.
+    - Zero comments in code files and all commits signed with `-s -S`.
+
 ### >>> UPDATE 2026-10-21: Milestone 2 — Command Mode AMOLED Background Flusher Stabilization & Race-Free Handoff <<<
 
 **STATE at 2026-10-21:**
