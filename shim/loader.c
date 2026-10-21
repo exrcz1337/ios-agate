@@ -160,10 +160,10 @@ const char *loader_boot(uintptr_t dtb)
 	con_hex2("BOOTARG", "pa=", ba_pa, "top=", top);
 
 	uintptr_t entry_pa = p->entry_va + pa_of_va_base;
-	uint64_t cpu1_ret = smc(PSCI_CPU_ON, 0x100, (uintptr_t)dsi_flush_loop, 0);
-	con_hex("CPU1", cpu1_ret);
 	con_hex("JUMP", entry_pa);
 	con_str("XNU", "jumping (fbcon clears screen)");
+
+	smc(PSCI_CPU_ON, 0x100, (uintptr_t)dsi_flush_loop, 0);
 
 	__asm__ volatile("dsb sy; ic iallu; dsb sy; isb" ::: "memory");
 	((xnu_entry_t)entry_pa)(ba_pa);

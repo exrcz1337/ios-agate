@@ -2,6 +2,20 @@
 
 ## Agent handoff / active work (2026-10-21, latest)
 
+### >>> UPDATE 2026-10-21: Milestone 2 — Command Mode AMOLED Background Flusher Stabilization & Race-Free Handoff <<<
+
+**STATE at 2026-10-21:**
+- Resolved uncoordinated concurrent DSI register write race condition between CPU 0 and CPU 1:
+  - `shim/loader.c`: moved `smc(PSCI_CPU_ON, 0x100, (uintptr_t)dsi_flush_loop, 0)` immediately before XNU jump, after all `con_hex` and `con_str` console prints.
+  - Verified disassembly in `shim/out/shim.elf`: `adr x2, dsi_flush_loop` and `smc #0` occur right before barrier and `blr x20`. CPU 0 never writes to DSI registers concurrently with CPU 1.
+- Verified timer pacing in `shim/start.S`:
+  - `dsi_flush_loop` uses `cntpct_el0` with `0x100000` ticks at 13 MHz (~80.66 ms / ~12.4 Hz), leaving >60 ms of idle bus time between flushes to eliminate panel DSC decompression collisions.
+- Verified DRAM carveout protection in `tools/mkadt.py`:
+  - `MEM_SIZE = 0x3e000000` (physical DRAM 0x40000000..0x7E000000) guarantees that framebuffer at 0x7E020000 is never touched by XNU page allocator.
+- Automated tests:
+  - `tests/test_m2.py`: disassembly verification, pacing verification, carveout verification, and zero comments check all passed.
+  - Rebuilt and signed `shim/out/shim-boot.img`.
+
 ### >>> UPDATE 2026-10-21: Milestone 1 — Framebuffer Format & Early Console Synchronization (24-bit RGB888, Stride 3240) <<<
 
 **STATE at 2026-10-21:**
