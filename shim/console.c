@@ -58,7 +58,7 @@ void con_init(void)
 
 	con_bpp = 4;
 	con_stride = con_w * 4;
-	con_bswap = 0;
+	con_bswap = 1;
 
 	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
 	if (l_addr >= 0x40000000 && l_addr < 0xc0000000)
@@ -71,7 +71,7 @@ void con_init(void)
 	volatile uint32_t *p_con = (volatile uint32_t *)(0x14000030UL + (uintptr_t)layer * 0x20UL);
 	volatile uint32_t *p_pitch = (volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL);
 	uint32_t val = *p_con;
-	*p_con = (val & ~((0xf << 12) | (1 << 24) | (1 << 25))) | (3 << 12);
+	*p_con = (val & ~((0xf << 12) | (1 << 24) | (1 << 25))) | (3 << 12) | (1 << 24);
 	*p_pitch = con_stride | (1 << 28);
 	con_flush();
 #endif

@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adt
 
 PHYS_BASE = 0x40000000
-MEM_SIZE = 0x40000000
+MEM_SIZE = 0x3e000000
 HIGH_PHYS_BASE = 0x100000000
 HIGH_MEM_SIZE = 0xfcc00000
 SOC_BASE = 0x01000000

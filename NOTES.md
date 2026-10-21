@@ -2,6 +2,23 @@
 
 ## Agent handoff / active work (2026-10-21, latest)
 
+### >>> UPDATE 2026-10-21: Framebuffer DRAM Protection (MEM_SIZE=0x3e000000) & BGRA Fix <<<
+
+**STATE at 2026-10-21 (late):**
+- **Root Cause of Post-Jump Noise Discovered:**
+  - `tools/mkadt.py` had `PHYS_BASE = 0x40000000`, `MEM_SIZE = 0x40000000` (1024 MB, ending at `0x80000000`).
+  - The AMOLED framebuffer is at `0x7E020000` (which is inside `[0x40000000 .. 0x80000000)`).
+  - When XNU VM subsystem initialized (`arm_vm_init` -> `vm_page_bootstrap`), it treated `0x7E020000` as general unreserved RAM, allocating heap pages, zeroes, and page tables directly over the framebuffer memory.
+  - The CPU 1 flusher actively pushed this kernel heap memory to the AMOLED panel, appearing as static noise.
+- **Fix:**
+  - In `tools/mkadt.py`, adjusted `MEM_SIZE = 0x3e000000` (992 MB, ending at `0x7E000000`).
+  - The entire 32MB carve-out `[0x7E000000 .. 0x80000000)` containing `0x7E020000` is now completely excluded from XNU's general page allocator, protecting it from being overwritten.
+  - In `shim/console.c`, enabled `OVL_CON_BYTE_SWAP` (`1 << 24`) and `con_bswap = 1` for true BGRA8888 (standard iOS format), fixing the color tint.
+- **Artifacts:**
+  - Repacked `shim/out/agate.adt` and `shim/out/payload.bin`.
+  - Rebuilt and signed `shim/out/shim-boot.img` (128 MB).
+  - Mirrored to `c:\Users\exerczz1\Documents\ios-agate\shim\out\shim-boot.img`.
+
 ### >>> UPDATE 2026-10-21: Reconfigured MediaTek OVL to 32-bit RGBA8888 (stride 4320) <<<
 
 **STATE at 2026-10-21:**
