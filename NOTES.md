@@ -1,6 +1,27 @@
 # iOS 16 on agate (Xiaomi 11T, MT6893 / Dimensity 1200) - working notes
 
-## Agent handoff / active work (2026-10-20, latest)
+## Agent handoff / active work (2026-10-21, latest)
+
+### >>> UPDATE 2026-10-21: Reconfigured MediaTek OVL to 32-bit RGBA8888 (stride 4320) <<<
+
+**STATE at 2026-10-21:**
+- **Observation:**
+  - After fixing GOT, the kernel launched and CPU 1 flusher actively refreshed the screen.
+  - However, when XNU booted, screen filled with 75% static/noise (identical to initial shim bug).
+- **Root Cause:**
+  - MediaTek OVL0 layer was initialized by LK in 24-bit RGB888 (`CFMT = 1`, 3 Bpp, pitch 3240).
+  - XNU (`start.s`, `sweet_early.c`, `sweet_fbcon`) writes 32-bit words (`uint32_t`, 4 Bpp, stride 4320).
+  - Writing 4 Bpp with stride 4320 into an OVL layer configured for 3 Bpp with pitch 3240 caused rows to overflow by 1 byte per pixel and skew diagonally across 75% of the screen.
+- **Solution:**
+  - In `shim/console.c` `con_init()`, explicitly reconfigured OVL layer:
+    - `*p_con = (*p_con & ~((0xf << 12) | (1 << 24) | (1 << 25))) | (3 << 12);` (`CFMT = 3` = RGBA8888)
+    - `*p_pitch = 4320 | (1 << 28);` (`PITCH = 4320`, with `OVL_CONST_BLEND` bit 28)
+    - `con_bpp = 4`, `con_stride = 4320`, `con_bswap = 0`
+    - Triggered `con_flush()`
+  - Now both shim and XNU write 32-bit pixels with 4320 pitch, perfectly matching OVL0 hardware configuration.
+- **Artifacts:**
+  - Rebuilt and signed `shim/out/shim-boot.img` (128 MB).
+  - Mirrored to `c:\Users\exerczz1\Documents\ios-agate\shim\out\shim-boot.img`.
 
 ### >>> UPDATE 2026-10-20: Secondary Core Background Flusher & GOT Elimination Fix <<<
 
