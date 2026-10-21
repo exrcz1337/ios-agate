@@ -41,8 +41,25 @@ void con_init(void)
 	else if (src_on & 8)
 		layer = 3;
 
+	uint32_t l_con = *(volatile uint32_t *)(0x14000030UL + (uintptr_t)layer * 0x20UL);
 	uint32_t l_size = *(volatile uint32_t *)(0x14000038UL + (uintptr_t)layer * 0x20UL);
+	uint32_t l_pitch = *(volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL) & 0xffff;
 	uint32_t l_addr = *(volatile uint32_t *)(0x14000f40UL + (uintptr_t)layer * 0x20UL);
+
+	uint32_t cfmt = (l_con >> 12) & 0xf;
+	uint32_t btsw = (l_con >> 24) & 1;
+	uint32_t rgbswap = (l_con >> 25) & 1;
+
+	if (cfmt == 0)
+		con_bpp = 2;
+	else if (cfmt == 1)
+		con_bpp = 3;
+	else
+		con_bpp = 4;
+
+	con_bswap = (btsw == 0) ^ rgbswap;
+	if (cfmt == 3)
+		con_bswap ^= 1;
 
 	uint32_t w = l_size & 0xfff;
 	uint32_t h = (l_size >> 16) & 0xfff;
@@ -56,9 +73,10 @@ void con_init(void)
 	else
 		con_h = FB_H;
 
-	con_bpp = 4;
-	con_stride = con_w * 4;
-	con_bswap = 1;
+	if (l_pitch >= con_w * con_bpp && l_pitch <= 16384)
+		con_stride = l_pitch;
+	else
+		con_stride = con_w * con_bpp;
 
 	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
 	if (l_addr >= 0x40000000 && l_addr < 0xc0000000)
@@ -67,13 +85,6 @@ void con_init(void)
 		con_fb = (volatile void *)(uintptr_t)rdma_fb;
 	else
 		con_fb = (volatile void *)FB_BASE;
-
-	volatile uint32_t *p_con = (volatile uint32_t *)(0x14000030UL + (uintptr_t)layer * 0x20UL);
-	volatile uint32_t *p_pitch = (volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL);
-	uint32_t val = *p_con;
-	*p_con = (val & ~((0xf << 12) | (1 << 24) | (1 << 25))) | (3 << 12) | (1 << 24);
-	*p_pitch = con_stride | (1 << 28);
-	con_flush();
 #endif
 }
 

@@ -2,6 +2,22 @@
 
 ## Agent handoff / active work (2026-10-21, latest)
 
+### >>> UPDATE 2026-10-21: DSC Decompression Timing Pacing & Original OVL Format Restored <<<
+
+**STATE at 2026-10-21 (late):**
+- **Root Cause of Post-Jump Noise:**
+  - The AMOLED panel is `k11t_42_02_0a_dsc_cmd` (Display Stream Compression in Command Mode).
+  - The background flusher `dsi_flush_loop` was pulsing `DSI0_START` with a tight cycle loop (~250 Hz, every 4 ms).
+  - Retriggering DSI before the panel's internal DSC decompressor finished decompressing the slice caused packet collision and desynchronization, which manifested as full-screen static noise!
+  - In addition, manual OVL layer writes to `L_CON` in `console.c` distorted color mapping (turning red into cyan).
+- **Solution:**
+  - In `shim/start.S`, modified `dsi_flush_loop` to use `cntpct_el0` with an 80.6 ms delay (`0x100000` ticks at 13 MHz, ~12.4 Hz). This gives the panel's DSC decompressor ample time to decode every frame completely before the next trigger.
+  - In `shim/console.c`, restored original working dynamic OVL configuration (matching LK format and restoring crystal-clear red background).
+  - In `tools/mkadt.py`, kept `MEM_SIZE = 0x3e000000` to prevent XNU from claiming `0x7E020000` as heap RAM.
+- **Artifacts:**
+  - Rebuilt `shim/out/agate.adt`, `shim/out/payload.bin`, and signed `shim/out/shim-boot.img`.
+  - Mirrored to `c:\Users\exerczz1\Documents\ios-agate\shim\out\shim-boot.img`.
+
 ### >>> UPDATE 2026-10-21: Framebuffer DRAM Protection (MEM_SIZE=0x3e000000) & BGRA Fix <<<
 
 **STATE at 2026-10-21 (late):**

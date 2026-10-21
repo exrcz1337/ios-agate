@@ -111,9 +111,12 @@ dsi_flush_loop:
 	str	wzr, [x4]
 	str	w1, [x4]
 	dsb	sy
-	mov	x2, #0x400000
-3:	subs	x2, x2, #1
-	b.ne	3b
+	mrs	x0, cntpct_el0
+	mov	x2, #0x100000
+	add	x0, x0, x2
+3:	mrs	x1, cntpct_el0
+	cmp	x1, x0
+	b.lo	3b
 	b	2b
 
 /*
