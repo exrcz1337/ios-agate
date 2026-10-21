@@ -2,6 +2,21 @@
 
 ## Agent handoff / active work (2026-10-21, latest)
 
+### >>> UPDATE 2026-10-21: Milestone 1 — Framebuffer Format & Early Console Synchronization (24-bit RGB888, Stride 3240) <<<
+
+**STATE at 2026-10-21:**
+- Synchronized all boot path display components to hardware 24-bit RGB888 (stride 3240 = 1080 * 3):
+  - `tools/mkadt.py`: `FB_STRIDE = 1080 * 3`, added `row-bytes = 3240` and `depth = 24` to `sweet-fbcon`, added `Framebuffer` to `/chosen/memory-map`.
+  - `shim/console.h`: `#define FB_STRIDE (FB_W * 3)`.
+  - `shim/console.c`: default `con_bpp = 3`.
+  - `shim/host_test.c`: adapted buffer to 24-bit RGB888 and direct raw PPM dump.
+  - `xnu/patches/0003-sweet-framebuffer-serial-console.patch`: `fbcon_base` typed as `volatile uint8_t*`, row clear 3240 bytes, 3 Bpp glyph rendering.
+  - `xnu/patches/0010-sweet-early-framebuffer-debug.patch`: `start.s` Stage 0 marker base `0x7E020000 + 2368 * 3240`, stride 3240, 24 quadword stores (192 bytes/row); `sweet_early.c` typed as `volatile uint8_t*`, stride 3240, 3 Bpp, byte pointer arithmetic and RGB marker rendering.
+  - `xnu/patches/0012-sweet-keep-debug-console-after-ttbr0.patch`: synchronized `sweet_early_relocate` to `volatile uint8_t*` and 48 px/stage markers, synchronized `pe_serial.c` context.
+- Verified build and tests:
+  - `mkadt.py` outputs valid ADT with `stride = 0xca8`, `depth = 0x18`, `Framebuffer = <0x7e020000 0x1be0000>`.
+  - `cd shim && ./build.sh` cleanly compiles, links without ABS64 relocations, runs `out/host_test` passing cleanly, and generates AVB-signed `shim-boot.img`.
+
 ### >>> UPDATE 2026-10-21: DSC Decompression Timing Pacing & Original OVL Format Restored <<<
 
 **STATE at 2026-10-21 (late):**

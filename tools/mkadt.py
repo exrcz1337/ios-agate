@@ -14,7 +14,7 @@ GICD, GICD_SIZE = 0x0c000000, 0x40000
 GICR, GICR_SIZE = 0x0c040000, 0x200000
 FB, FB_SIZE = 0x7E020000, 0x1BE0000
 AGATE_ECID = 0x4147415445000001
-FB_W, FB_H, FB_STRIDE = 1080, 2400, 1080 * 4
+FB_W, FB_H, FB_STRIDE = 1080, 2400, 1080 * 3
 UFS, UFS_SIZE = 0x11270000, 0x10000
 TIMEBASE = 13000000
 VTIMER_INTID = 27
@@ -70,7 +70,7 @@ def build(seed=None, qemu=False, highmem=False):
         ('effective-production-status-ap', u32(0)),
         ('certificate-security-mode', u32(1)),
         ('effective-security-mode-sep', u32(1)),
-    ], [node('memory-map', [ph()]),
+    ], [node('memory-map', [ph(), ('Framebuffer', u64(FB, FB_SIZE))]),
         node('asmb', [ph(), ('lp-sip0', u64(0x6f)), ('lp-sip1', u32(1))])])
 
     cpu_nodes = []
@@ -137,6 +137,8 @@ def build(seed=None, qemu=False, highmem=False):
         ('width', u32(FB_W)),
         ('height', u32(FB_H)),
         ('stride', u32(FB_STRIDE)),
+        ('row-bytes', u32(FB_STRIDE)),
+        ('depth', u32(24)),
     ])
 
     ufs = node('sweet-ufs', [

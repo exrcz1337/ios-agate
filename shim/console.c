@@ -11,7 +11,7 @@ volatile void *con_fb = (volatile void *)FB_BASE;
 uint32_t con_stride = FB_STRIDE;
 uint32_t con_w = FB_W;
 uint32_t con_h = FB_H;
-uint32_t con_bpp = 4;
+uint32_t con_bpp = 3;
 uint32_t con_bswap = 0;
 
 static uint32_t con_bg;

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "console.h"
 
-static uint32_t host_fb[FB_H * FB_STRIDE / 4];
+static uint8_t host_fb[FB_H * FB_STRIDE];
 
 int main(void)
 {
@@ -17,10 +17,7 @@ int main(void)
 	con_hex("ESR", 0x96000010);
 	FILE *f = fopen("out/host.ppm", "wb");
 	fprintf(f, "P6 %d %d 255\n", FB_W, FB_H);
-	for (int i = 0; i < FB_W * FB_H; i++) {
-		unsigned char px[3] = { host_fb[i] >> 16, host_fb[i] >> 8, host_fb[i] };
-		fwrite(px, 1, 3, f);
-	}
+	fwrite(host_fb, 1, FB_H * FB_STRIDE, f);
 	fclose(f);
 	return 0;
 }

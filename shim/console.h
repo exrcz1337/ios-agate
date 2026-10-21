@@ -4,7 +4,7 @@
 #define FB_BASE		0x7E020000UL
 #define FB_W		1080
 #define FB_H		2400
-#define FB_STRIDE	(FB_W * 4)
+#define FB_STRIDE	(FB_W * 3)
 
 #define RED	0xffff0000U
 #define BLUE	0xff0000a0U

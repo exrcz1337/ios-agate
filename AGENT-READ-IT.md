@@ -4,20 +4,17 @@
 После каждого изменения обновляй .md файлы (`NOTES.md`, `AGENT-READ-IT.md`) в WSL.
 
 ## Текущий статус проекта (2026-10-21, поздний вечер)
-1. **Ядро XNU реально стартует и работает с фоновым флашером на CPU 1!**
-2. **Найдена точная причина шума на экране:**
-   - Панель Xiaomi 11T работает в режиме **DSC (Display Stream Compression) Command Mode**.
-   - Цикл `dsi_flush_loop` слишком быстро долбил регистр `DSI0_START` (на частоте ~250 Гц, каждые ~4 мс).
-   - Аппаратный декодер сжатия DSC внутри экрана сбивался от слишком частых рестартов посреди передачи слайсов, из-за чего поток пакетов ломался и экран превращался в шум.
-   - Попытка принудительно переписать регистры OVL в 32 бита сломала цветовые каналы (сделав фон бирюзовым вместо красного).
-3. **Исправление:**
-   - В `shim/start.S` цикл `dsi_flush_loop` переведен на таймер `cntpct_el0` с паузой **80.6 мс** (`0x100000` тиков на 13 МГц, ~12.5 FPS). Это гарантирует, что каждый кадр полностью передается и декодируется без коллизий.
-   - В `shim/console.c` возвращена проверенная динамическая конфигурация OVL (родные цвета шима восстановлены).
-   - В `tools/mkadt.py` сохранен лимит `MEM_SIZE = 0x3e000000`, чтобы ядро не перезаписывало память экрана кучей.
-4. **Готовые бинарники собраны и подписаны:**
-   - Образ для прошивки: `shim/out/shim-boot.img` (также скопирован в `c:\Users\exerczz1\Documents\ios-agate\shim/out/shim-boot.img`).
+1. **Milestone 1 — Framebuffer Format & Early Console Synchronization (24-bit RGB888, Stride 3240) ЗАВЕРШЕН:**
+   - `tools/mkadt.py`: установлены `FB_STRIDE = 1080 * 3` (3240), `sweet-fbcon` обновлен с `row-bytes = 3240` и `depth = 24`, в `/chosen/memory-map` добавлен узел `Framebuffer`.
+   - `shim/console.h` & `shim/console.c`: `FB_STRIDE = (FB_W * 3)` и дефолтный `con_bpp = 3`.
+   - `shim/host_test.c`: адаптирован под 24-bit RGB888 буфер.
+   - `xnu/patches/0003-sweet-framebuffer-serial-console.patch`: `fbcon` переведен на `volatile uint8_t*`, очистка строк по 3240 байт, отрисовка глифов по 3 байта на пиксель.
+   - `xnu/patches/0010-sweet-early-framebuffer-debug.patch`: маркер Stage 0 в `start.s` обновлен на базу `0x7E020000 + 2368 * 3240`, шаг строки 3240, 24 quadword stores (192 байта/строка); `sweet_early.c` переведен на `volatile uint8_t*`, stride 3240, 3 Bpp, побайтовая математика и отрисовка RGB.
+   - `xnu/patches/0012-sweet-keep-debug-console-after-ttbr0.patch`: `sweet_early.c` и `pe_serial.c` синхронизированы с 24-bit RGB888 и `volatile uint8_t*` relocation.
+2. **Готовые бинарники собраны и подписаны:**
+   - Образ для прошивки: `shim/out/shim-boot.img` (также скопирован в `c:\Users\exerczz1\Documents\ios-agate\shim\out\shim-boot.img`).
    - Команда прошивки: `fastboot flash boot shim/out/shim-boot.img`.
-5. **Правила разработки пользователя:**
+3. **Правила разработки пользователя:**
    - Не оставлять комментарии в коде (`//`, `/* */`, `#`).
    - Делать все просто, не усложнять код/решения.
    - Всегда коммитить с флагами `-s -S`.
