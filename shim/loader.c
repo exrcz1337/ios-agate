@@ -116,11 +116,16 @@ static efi_status EFIAPI efi_stall(uint64_t us)
 	__asm__ volatile("mrs %0, cntvct_el0" : "=r"(start));
 	uint64_t ticks = us * 13;
 	uint64_t cur = 0;
+	uint64_t last_pet = start;
+	*(volatile uint32_t *)0x10007008 = 0x1971;
 	do {
-		*(volatile uint32_t *)0x10007008 = 0x1971;
 		__asm__ volatile("mrs %0, cntvct_el0" : "=r"(cur));
+		if (cur - last_pet >= 13000000) {
+			*(volatile uint32_t *)0x10007008 = 0x1971;
+			last_pet = cur;
+		}
 	} while (cur - start < ticks);
-	con_flush_force();
+	*(volatile uint32_t *)0x10007008 = 0x1971;
 	return 0;
 }
 
@@ -165,8 +170,16 @@ static efi_status EFIAPI con_out_string(struct efi_text_output *self, const char
 			continue;
 		if (c == '\f') {
 			con_clear(0);
-			con_flush_force();
 			len = 0;
+			continue;
+		}
+		if (c == '\v') {
+			if (len > 0) {
+				buf[len] = 0;
+				con_str("", buf);
+				len = 0;
+			}
+			con_flush_force();
 			continue;
 		}
 		if (c == '\n') {

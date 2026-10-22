@@ -142,14 +142,12 @@ void con_clear(uint32_t bg)
 			}
 		}
 	} else if (con_bpp == 4) {
+		uint32_t px = (0xffU << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
+		uint64_t px64 = ((uint64_t)px << 32) | px;
 		for (int y = 0; y < (int)con_h; y++) {
-			uint8_t *line = (uint8_t *)con_fb + y * con_stride;
-			for (int x = 0; x < (int)con_w; x++) {
-				line[x * 4 + 0] = r;
-				line[x * 4 + 1] = g;
-				line[x * 4 + 2] = b;
-				line[x * 4 + 3] = 0xff;
-			}
+			volatile uint64_t *line = (volatile uint64_t *)((uint8_t *)con_fb + y * con_stride);
+			for (int x = 0; x < (int)con_w / 2; x++)
+				line[x] = px64;
 		}
 	} else if (con_bpp == 2) {
 		uint16_t v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
