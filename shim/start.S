@@ -133,7 +133,7 @@ dsi_flush_loop:
  */
 .macro vent slot
 	.balign	0x80
-	stp	x29, x30, [sp, #-16]!
+	msr	sp_el0, x29
 	mov	x29, #\slot
 	b	exc_common
 .endm
@@ -187,10 +187,10 @@ exc_common:
 	stp	x24, x25, [x30, #192]
 	stp	x26, x27, [x30, #208]
 	str	x28, [x30, #224]
-	ldp	x0, x1, [sp]
+	mrs	x0, sp_el0
+	mrs	x1, elr_el1
 	stp	x0, x1, [x30, #232]
 	mov	x0, sp
-	add	x0, x0, #16
 	str	x0, [x30, #248]
 
 	adrp	x0, _stack_top
@@ -221,9 +221,12 @@ exc_common:
 	stp	x24, x25, [sp, #192]
 	stp	x26, x27, [sp, #208]
 	str	x28, [sp, #224]
+	mrs	x0, sp_el0
+	stp	x0, x30, [sp, #-16]!
 	mov	x0, x29
-	mov	x1, sp
+	add	x1, sp, #16
 	bl	exc_handler
+	ldp	x29, x30, [sp], #16
 	ldp	x0, x1, [sp, #0]
 	ldp	x2, x3, [sp, #16]
 	ldp	x4, x5, [sp, #32]
@@ -240,7 +243,6 @@ exc_common:
 	ldp	x26, x27, [sp, #208]
 	ldr	x28, [sp, #224]
 	add	sp, sp, #(30 * 8)
-	ldp	x29, x30, [sp], #16
 	eret
 
 	.data
