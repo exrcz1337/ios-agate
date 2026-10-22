@@ -170,6 +170,8 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 		}
 	}
 	con_clear(BLUE);
+	delay_ms(50);
+	con_skip();
 	con_skip();
 	int s = slot & 3;
 	if (s == 0)
@@ -426,6 +428,7 @@ void shim_main(uint64_t dtb)
 	con_hex2("DISP", "w=", con_w, "h=", con_h);
 	con_hex2("FMT", "bpp=", con_bpp, "bswap=", con_bswap);
 	con_skip();
+	con_flush();
 	const char *why = loader_boot(dtb);
 	con_str("LOADER", why);
 	con_skip();

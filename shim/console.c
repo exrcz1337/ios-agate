@@ -64,8 +64,10 @@ void con_init(void)
 	con_h = FB_H;
 	con_stride = FB_W * con_bpp;
 
+	*(volatile uint32_t *)0x14000020 = ((uint32_t)FB_H << 16) | (uint32_t)FB_W;
 	*(volatile uint32_t *)(0x14000038UL + (uintptr_t)layer * 0x20UL) = ((uint32_t)FB_H << 16) | (uint32_t)FB_W;
-	*(volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL) = con_stride;
+	uint32_t cur_p = *(volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL);
+	*(volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL) = (cur_p & ~0xffffU) | (con_stride & 0xffffU);
 
 	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
 	if (l_addr >= 0x40000000 && l_addr < 0xc0000000)
@@ -191,7 +193,6 @@ void con_str(const char *label, const char *s)
 	put_str(0, label, YELLOW);
 	put_str(LABEL_COLS, s, WHITE);
 	row++;
-	con_flush();
 }
 
 void con_hex(const char *label, uint64_t v)
@@ -215,5 +216,4 @@ void con_hex2(const char *label, const char *a, uint32_t va, const char *b, uint
 		put_str(col, buf, WHITE);
 	}
 	row++;
-	con_flush();
 }
