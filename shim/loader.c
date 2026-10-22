@@ -112,6 +112,7 @@ static efi_status EFIAPI efi_allocate_pages(int type, int mem_type, uint64_t pag
 
 static efi_status EFIAPI efi_stall(uint64_t us)
 {
+	con_flush_force();
 	uint64_t start = 0;
 	__asm__ volatile("mrs %0, cntvct_el0" : "=r"(start));
 	uint64_t ticks = us * 13;
@@ -185,7 +186,6 @@ static efi_status EFIAPI con_out_string(struct efi_text_output *self, const char
 		if (c == '\n') {
 			buf[len] = 0;
 			con_str("", buf);
-			con_flush();
 			len = 0;
 		} else if (len < 120) {
 			buf[len++] = c;
