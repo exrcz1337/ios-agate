@@ -122,6 +122,24 @@ static efi_status EFIAPI efi_stall(uint64_t us)
 	return 0;
 }
 
+static efi_status EFIAPI efi_locate_handle_buffer(int type, const efi_guid *guid, void *key, uint64_t *count, efi_handle **buf)
+{
+	(void)type;
+	(void)guid;
+	(void)key;
+	if (count)
+		*count = 0;
+	if (buf)
+		*buf = 0;
+	return 0x800000000000000eULL;
+}
+
+static efi_status EFIAPI efi_handle_protocol(efi_handle h, const efi_guid *guid, void **iface)
+{
+	(void)h;
+	return efi_locate_protocol(guid, 0, iface);
+}
+
 static void EFIAPI efi_reset_system(int type, efi_status status, uint64_t size, void *data)
 {
 	(void)type;
@@ -190,6 +208,8 @@ const char *loader_boot(uintptr_t dtb)
 
 	boot_services.set_watchdog_timer = efi_set_watchdog_timer;
 	boot_services.locate_protocol = efi_locate_protocol;
+	boot_services.locate_handle_buffer = efi_locate_handle_buffer;
+	boot_services.handle_protocol = efi_handle_protocol;
 	boot_services.get_memory_map = efi_get_memory_map;
 	boot_services.allocate_pages = efi_allocate_pages;
 	boot_services.stall = efi_stall;
