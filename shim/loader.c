@@ -117,8 +117,10 @@ static efi_status EFIAPI efi_stall(uint64_t us)
 	uint64_t ticks = us * 13;
 	uint64_t cur = 0;
 	do {
+		*(volatile uint32_t *)0x10007008 = 0x1971;
 		__asm__ volatile("mrs %0, cntvct_el0" : "=r"(cur));
 	} while (cur - start < ticks);
+	con_flush_force();
 	return 0;
 }
 
@@ -161,9 +163,15 @@ static efi_status EFIAPI con_out_string(struct efi_text_output *self, const char
 		char c = (char)(*str++);
 		if (c == '\r')
 			continue;
+		if (c == '\f') {
+			con_clear(0);
+			con_flush_force();
+			len = 0;
+			continue;
+		}
 		if (c == '\n') {
 			buf[len] = 0;
-			con_str("LOADER", buf);
+			con_str("", buf);
 			con_flush();
 			len = 0;
 		} else if (len < 120) {

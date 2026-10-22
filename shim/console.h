@@ -22,6 +22,7 @@ extern uint32_t con_bswap;
 void con_init(void);
 void con_clear(uint32_t bg);
 void con_flush(void);
+void con_flush_force(void);
 void con_skip(void);
 void con_str(const char *label, const char *s);
 void con_hex(const char *label, uint64_t v);

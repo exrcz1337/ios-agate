@@ -20,6 +20,19 @@ static int row;
 void con_flush(void)
 {
 #ifndef __x86_64__
+	static uint64_t last_flush = 0;
+	uint64_t now_val = 0;
+	__asm__ volatile("mrs %0, cntvct_el0" : "=r"(now_val));
+	if (now_val - last_flush < 130000 && last_flush != 0)
+		return;
+	last_flush = now_val;
+	con_flush_force();
+#endif
+}
+
+void con_flush_force(void)
+{
+#ifndef __x86_64__
 	__asm__ volatile("dsb sy" ::: "memory");
 	*(volatile uint32_t *)0x14117020 = 1;
 	*(volatile uint32_t *)0x1400e000 = 0;
@@ -189,8 +202,21 @@ void con_skip(void)
 
 void con_str(const char *label, const char *s)
 {
-	put_str(0, label, YELLOW);
-	put_str(LABEL_COLS, s, WHITE);
+	int max_cols = (con_w - MARGIN) / CH_W;
+	int col = 0;
+	if (label && *label) {
+		put_str(0, label, YELLOW);
+		col = LABEL_COLS;
+	}
+	if (!s)
+		s = "(null)";
+	while (*s) {
+		if (col >= max_cols) {
+			row++;
+			col = 0;
+		}
+		put_char(col++, *s++, WHITE);
+	}
 	row++;
 }
 
