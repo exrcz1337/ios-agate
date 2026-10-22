@@ -3963,8 +3963,8 @@ efi_main(efi_handle image, efi_system_table *st)
 				PLAT = platforms[i];
 		if (PLAT == &platform_qemu_virt)
 			ramfb_phone_screen();
-		if (PLAT == &platform_agate)
-			SCREEN.stride = 3240;
+		if (PLAT == &platform_agate && GOP->mode->info->height > 0)
+			SCREEN.stride = (uint32_t)(GOP->mode->fb_size / GOP->mode->info->height);
 		print("display %d x %d at %x\n", (uint64_t)SCREEN.width, (uint64_t)SCREEN.height, SCREEN.base);
 	}
 	print("platform %s\n", PLAT->name);
