@@ -137,14 +137,18 @@ static efi_status EFIAPI con_out_string(struct efi_text_output *self, const char
 	(void)self;
 	if (!str)
 		return 0;
-	char buf[128];
-	int i = 0;
+	static char buf[128];
+	static int len = 0;
 	while (*str) {
-		buf[i++] = (char)(*str++);
-		if (i == 127 || *str == 0) {
-			buf[i] = 0;
-			con_str("XNU", buf);
-			i = 0;
+		char c = (char)(*str++);
+		if (c == '\r')
+			continue;
+		if (c == '\n') {
+			buf[len] = 0;
+			con_str("LOADER", buf);
+			len = 0;
+		} else if (len < 120) {
+			buf[len++] = c;
 		}
 	}
 	return 0;
@@ -165,9 +169,6 @@ const char *loader_boot(uintptr_t dtb)
 
 	con_str("LOADER", "copying payload to PAYLOAD_BASE");
 	copy64(PAYLOAD_BASE, rd_start, rd_end - rd_start);
-
-	con_str("LOADER", "starting dsi_flush_loop on cpu 1");
-	smc(PSCI_CPU_ON, 0x100, (uint64_t)(uintptr_t)dsi_flush_loop, 0);
 
 	gop_info.version = 0;
 	gop_info.width = con_w;
