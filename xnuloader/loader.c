@@ -340,9 +340,9 @@ write_logs(const char *klog, uint64_t klog_len)
 				int page = 1;
 				while (pos < klog_len) {
 					put_char('\f');
-					print("\n-- KERNEL LOG p.%d (%d bytes) --\n", (uint64_t)page, klog_len);
+					print("-- KERNEL LOG p.%d (%d bytes) --\n\n", (uint64_t)page, klog_len);
 					int lines = 0;
-					while (pos < klog_len && lines < 36) {
+					while (pos < klog_len && lines < 34) {
 						char c = klog[pos++];
 						if (c == '\r')
 							continue;
@@ -350,6 +350,7 @@ write_logs(const char *klog, uint64_t klog_len)
 						if (c == '\n')
 							lines++;
 					}
+					put_char('\v');
 					page++;
 					for (int s = 0; s < 7; s++) {
 						BS->stall(1000000);
