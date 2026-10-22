@@ -159,6 +159,52 @@ vectors:
 	vent 15
 
 exc_common:
+	cmp	x29, #5
+	b.eq	1f
+
+	msr	daifset, #0xf
+	mrs	x30, sctlr_el1
+	bic	x30, x30, #0x1
+	bic	x30, x30, #0x4
+	bic	x30, x30, #0x1000
+	msr	sctlr_el1, x30
+	isb
+
+	adrp	x30, exc_frame
+	add	x30, x30, :lo12:exc_frame
+	stp	x0, x1, [x30, #0]
+	stp	x2, x3, [x30, #16]
+	stp	x4, x5, [x30, #32]
+	stp	x6, x7, [x30, #48]
+	stp	x8, x9, [x30, #64]
+	stp	x10, x11, [x30, #80]
+	stp	x12, x13, [x30, #96]
+	stp	x14, x15, [x30, #112]
+	stp	x16, x17, [x30, #128]
+	stp	x18, x19, [x30, #144]
+	stp	x20, x21, [x30, #160]
+	stp	x22, x23, [x30, #176]
+	stp	x24, x25, [x30, #192]
+	stp	x26, x27, [x30, #208]
+	str	x28, [x30, #224]
+	ldp	x0, x1, [sp]
+	stp	x0, x1, [x30, #232]
+	mov	x0, sp
+	add	x0, x0, #16
+	str	x0, [x30, #248]
+
+	adrp	x0, _stack_top
+	add	x0, x0, :lo12:_stack_top
+	mov	sp, x0
+
+	mov	x0, x29
+	mov	x1, x30
+	bl	exc_handler
+
+2:	wfe
+	b	2b
+
+1:
 	sub	sp, sp, #(30 * 8)
 	stp	x0, x1, [sp, #0]
 	stp	x2, x3, [sp, #16]
@@ -196,3 +242,9 @@ exc_common:
 	add	sp, sp, #(30 * 8)
 	ldp	x29, x30, [sp], #16
 	eret
+
+	.data
+	.balign 16
+	.globl exc_frame
+exc_frame:
+	.space 256

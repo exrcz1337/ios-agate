@@ -158,11 +158,13 @@ static void irq_handler(void)
 
 void exc_handler(uint64_t slot, uint64_t *regs)
 {
-	if (slot == 5) {	/* IRQ from current EL, SPx */
+	if (slot == 5) {
 		irq_handler();
 		return;
 	}
 	con_clear(BLUE);
+	con_skip();
+	con_skip();
 	int s = slot & 3;
 	if (s == 0)
 		con_str("PANIC", "SYNC");
@@ -178,10 +180,15 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 	con_hex("ELR", rsr("elr_el1"));
 	con_hex("FAR", rsr("far_el1"));
 	con_hex("SPSR", rsr("spsr_el1"));
+	con_hex("LR", regs[30]);
+	con_hex("SP", regs[31]);
 	con_hex("X0", regs[0]);
 	con_hex("X1", regs[1]);
-	con_hex("X30", regs[29]);	/* stashed lr is just above the frame */
-	reset(40);
+	for (;;) {
+		wdt_pet();
+		con_flush();
+		delay_ms(100);
+	}
 }
 
 /* ---- SMP ---- */

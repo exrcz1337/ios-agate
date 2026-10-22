@@ -61,22 +61,9 @@ void con_init(void)
 	if (cfmt == 3)
 		con_bswap ^= 1;
 
-	uint32_t w = l_size & 0xfff;
-	uint32_t h = (l_size >> 16) & 0xfff;
-	if (w >= 320 && w <= 4096)
-		con_w = w;
-	else
-		con_w = FB_W;
-
-	if (h >= 480 && h <= 4096)
-		con_h = h;
-	else
-		con_h = FB_H;
-
-	if (l_pitch >= con_w * con_bpp && l_pitch <= 16384)
-		con_stride = l_pitch;
-	else
-		con_stride = con_w * con_bpp;
+	con_w = FB_W;
+	con_h = FB_H;
+	con_stride = FB_STRIDE;
 
 	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
 	if (l_addr >= 0x40000000 && l_addr < 0xc0000000)
