@@ -342,7 +342,7 @@ write_logs(const char *klog, uint64_t klog_len)
 					put_char('\f');
 					print("-- KERNEL LOG p.%d (%d bytes) --\n\n", (uint64_t)page, klog_len);
 					int lines = 0;
-					while (pos < klog_len && lines < 34) {
+					while (pos < klog_len && lines < 26) {
 						char c = klog[pos++];
 						if (c == '\r')
 							continue;
@@ -397,6 +397,7 @@ static void
 flush_log(void)
 {
 	write_logs(NULL, 0);
+	put_char('\v');
 }
 
 /* ------------------------------------------------------------------------ */
