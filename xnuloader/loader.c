@@ -2961,7 +2961,7 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
 			verbose |= starts_with(c, "-v") && (c[2] == ' ' || c[2] == 0) && (c == pi.cmdline || c[-1] == ' ');
 		}
 		ba->video.v_baseAddr = SCREEN.base;
-		ba->video.v_display = verbose ? 0 : 1;
+		ba->video.v_display = (PLAT == &platform_agate) ? 1 : (verbose ? 0 : 1);
 		ba->video.v_rowBytes = (PLAT == &platform_agate) ? 3240 : SCREEN.stride;
 		ba->video.v_width = SCREEN.width;
 		ba->video.v_height = SCREEN.height;
@@ -3982,6 +3982,7 @@ efi_main(efi_handle image, efi_system_table *st)
 	if (have_payload) {
 		run_kernel(0, 0);
 	}
+	BS->stall(30000000);
 	reboot();
 	return 0;
 }
