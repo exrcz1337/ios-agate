@@ -129,6 +129,7 @@ dsi_flush_loop:
 	.balign	0x80
 	msr	tpidr_el0, x0
 	msr	sp_el0, x1
+	msr	tpidr_el1, x2
 	mov	x0, #\slot
 	b	exc_common
 .endm
@@ -158,15 +159,27 @@ exc_common:
 	b.eq	1f
 
 	msr	daifset, #0xf
+
+	adrp	x1, panic_lock
+	ldr	w2, [x1, :lo12:panic_lock]
+	cbnz	w2, 2f
+	mov	w2, #1
+	str	w2, [x1, :lo12:panic_lock]
+	dsb	sy
+
 	mrs	x1, sctlr_el1
 	bic	x1, x1, #0x1
 	bic	x1, x1, #0x4
 	bic	x1, x1, #0x1000
 	msr	sctlr_el1, x1
 	isb
+	ic	iallu
+	dsb	sy
+	isb
 
 	adrp	x1, exc_frame
 	add	x1, x1, :lo12:exc_frame
+	mrs	x2, tpidr_el1
 	stp	x2, x3, [x1, #16]
 	stp	x4, x5, [x1, #32]
 	stp	x6, x7, [x1, #48]
@@ -206,7 +219,6 @@ exc_common:
 
 1:
 	sub	sp, sp, #(32 * 8)
-	stp	x2, x3, [sp, #16]
 	stp	x4, x5, [sp, #32]
 	stp	x6, x7, [sp, #48]
 	stp	x8, x9, [sp, #64]
@@ -221,6 +233,8 @@ exc_common:
 	stp	x26, x27, [sp, #208]
 	stp	x28, x29, [sp, #224]
 	str	x30, [sp, #240]
+	mrs	x2, tpidr_el1
+	stp	x2, x3, [sp, #16]
 	mrs	x2, tpidr_el0
 	mrs	x3, sp_el0
 	stp	x2, x3, [sp, #0]
@@ -251,6 +265,11 @@ exc_common:
 	eret
 
 	.data
+	.balign 8
+	.globl panic_lock
+panic_lock:
+	.quad 0
+
 	.balign 16
 	.globl exc_frame
 exc_frame:

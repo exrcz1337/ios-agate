@@ -113,15 +113,8 @@ static uint64_t now(void)
 static void delay_ms(unsigned ms)
 {
 	uint64_t end = now() + rsr("cntfrq_el0") / 1000 * ms;
-	uint64_t last = 0;
-	while (now() < end) {
+	while (now() < end)
 		wdt_pet();
-		uint64_t t = now();
-		if (t - last > 1300000) {
-			con_flush();
-			last = t;
-		}
-	}
 }
 
 static void __attribute__((noreturn)) reset(unsigned after_s)
@@ -170,7 +163,6 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 		}
 	}
 	con_clear(BLUE);
-	delay_ms(50);
 	con_skip();
 	con_skip();
 	int s = slot & 3;
@@ -183,7 +175,6 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 	else
 		con_str("PANIC", "SERROR");
 	con_hex2("SLOT", "n=", slot, "cpu=", rsr("mpidr_el1"));
-	con_str("STAGE", stage ? stage : "none");
 	con_hex("ESR", regs[33]);
 	con_hex("ELR", regs[34]);
 	con_hex("FAR", regs[35]);
@@ -192,11 +183,15 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 	con_hex("SP", regs[31]);
 	con_hex("X0", regs[0]);
 	con_hex("X1", regs[1]);
+	const char *st = "none";
+	if ((uintptr_t)stage >= 0x40080000 && (uintptr_t)stage < 0x400a0000)
+		st = stage;
+	con_str("STAGE", st);
 	con_flush();
 	for (;;) {
 		wdt_pet();
 		con_flush();
-		delay_ms(100);
+		delay_ms(200);
 	}
 }
 

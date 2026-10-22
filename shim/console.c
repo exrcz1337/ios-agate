@@ -146,7 +146,6 @@ void con_clear(uint32_t bg)
 				line[x] = v;
 		}
 	}
-	con_flush();
 }
 
 static void put_char(int col, char ch, uint32_t fg)
