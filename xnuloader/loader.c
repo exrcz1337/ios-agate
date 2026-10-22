@@ -2962,10 +2962,10 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
 		}
 		ba->video.v_baseAddr = SCREEN.base;
 		ba->video.v_display = verbose ? 0 : 1;
-		ba->video.v_rowBytes = SCREEN.stride;
+		ba->video.v_rowBytes = (PLAT == &platform_agate) ? 3240 : SCREEN.stride;
 		ba->video.v_width = SCREEN.width;
 		ba->video.v_height = SCREEN.height;
-		ba->video.v_depth = 32;
+		ba->video.v_depth = (PLAT == &platform_agate) ? 24 : 32;
 	}
 	/*
 	 * No "-v" by default: on the phone the verbose console is a text
@@ -3346,6 +3346,8 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
 				return 1;
 			}
 		} else {
+			print("JUMPING to XNU in 5s...\n");
+			BS->stall(5000000);
 			jump_to_kernel(entry_va + slide, ba_pa);
 		}
 	}
@@ -3961,6 +3963,8 @@ efi_main(efi_handle image, efi_system_table *st)
 				PLAT = platforms[i];
 		if (PLAT == &platform_qemu_virt)
 			ramfb_phone_screen();
+		if (PLAT == &platform_agate)
+			SCREEN.stride = 3240;
 		print("display %d x %d at %x\n", (uint64_t)SCREEN.width, (uint64_t)SCREEN.height, SCREEN.base);
 	}
 	print("platform %s\n", PLAT->name);
