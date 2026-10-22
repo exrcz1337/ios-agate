@@ -63,7 +63,7 @@ static uint8_t data[2 * BLOCK] __attribute__((aligned(4096)));
 static uint64_t ticks(void)
 {
 	uint64_t t;
-	__asm__ volatile("isb; mrs %0, cntvct_el0" : "=r"(t));
+	__asm__ volatile("isb; mrs %0, cntpct_el0" : "=r"(t));
 	return t;
 }
 

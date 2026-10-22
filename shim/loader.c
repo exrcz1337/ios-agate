@@ -112,15 +112,14 @@ static efi_status EFIAPI efi_allocate_pages(int type, int mem_type, uint64_t pag
 
 static efi_status EFIAPI efi_stall(uint64_t us)
 {
-	con_flush_force();
 	uint64_t start = 0;
-	__asm__ volatile("mrs %0, cntvct_el0" : "=r"(start));
+	__asm__ volatile("isb; mrs %0, cntpct_el0" : "=r"(start));
 	uint64_t ticks = us * 13;
 	uint64_t cur = 0;
 	uint64_t last_pet = start;
 	*(volatile uint32_t *)0x10007008 = 0x1971;
 	do {
-		__asm__ volatile("mrs %0, cntvct_el0" : "=r"(cur));
+		__asm__ volatile("isb; mrs %0, cntpct_el0" : "=r"(cur));
 		if (cur - last_pet >= 13000000) {
 			*(volatile uint32_t *)0x10007008 = 0x1971;
 			last_pet = cur;

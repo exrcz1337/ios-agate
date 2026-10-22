@@ -22,7 +22,7 @@ void con_flush(void)
 #ifndef __x86_64__
 	static uint64_t last_flush = 0;
 	uint64_t now_val = 0;
-	__asm__ volatile("mrs %0, cntvct_el0" : "=r"(now_val));
+	__asm__ volatile("isb; mrs %0, cntpct_el0" : "=r"(now_val));
 	if (now_val - last_flush < 130000 && last_flush != 0)
 		return;
 	last_flush = now_val;
