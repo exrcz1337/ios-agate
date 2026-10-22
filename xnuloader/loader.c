@@ -569,7 +569,7 @@ static const struct platform platform_agate = {
 	.cores = 8,
 	.core_shift = 8,
 	.small_cores = 0x0f,
-	.fb_base = 0x7e020000,
+	.fb_base = 0x7ba16000,
 };
 
 static const struct platform *const platforms[] = {
@@ -2961,11 +2961,11 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
 			verbose |= starts_with(c, "-v") && (c[2] == ' ' || c[2] == 0) && (c == pi.cmdline || c[-1] == ' ');
 		}
 		ba->video.v_baseAddr = SCREEN.base;
-		ba->video.v_display = (PLAT == &platform_agate) ? 1 : (verbose ? 0 : 1);
-		ba->video.v_rowBytes = (PLAT == &platform_agate) ? 3240 : SCREEN.stride;
+		ba->video.v_display = verbose ? 0 : 1;
+		ba->video.v_rowBytes = SCREEN.stride;
 		ba->video.v_width = SCREEN.width;
 		ba->video.v_height = SCREEN.height;
-		ba->video.v_depth = (PLAT == &platform_agate) ? 24 : 32;
+		ba->video.v_depth = 32;
 	}
 	/*
 	 * No "-v" by default: on the phone the verbose console is a text
@@ -3959,7 +3959,7 @@ efi_main(efi_handle image, efi_system_table *st)
 		SCREEN.height = GOP->mode->info->height;
 		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
 		for (unsigned i = 0; i < sizeof(platforms) / sizeof(platforms[0]); i++)
-			if (platforms[i]->fb_base == SCREEN.base)
+			if (platforms[i]->fb_base == SCREEN.base || (platforms[i] == &platform_agate && (SCREEN.base == 0x7ba16000 || SCREEN.base == 0x7e020000)))
 				PLAT = platforms[i];
 		if (PLAT == &platform_qemu_virt)
 			ramfb_phone_screen();
