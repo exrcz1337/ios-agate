@@ -357,9 +357,6 @@ write_logs(const char *klog, uint64_t klog_len)
 				}
 			}
 		}
-		for (;;) {
-			BS->stall(1000000);
-		}
 		return;
 	}
 	uint64_t bs = bio->media->block_size;
