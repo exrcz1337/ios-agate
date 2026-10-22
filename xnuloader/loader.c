@@ -352,7 +352,7 @@ write_logs(const char *klog, uint64_t klog_len)
 					}
 					put_char('\v');
 					page++;
-					for (int s = 0; s < 7; s++) {
+					for (int s = 0; s < 4; s++) {
 						BS->stall(1000000);
 					}
 				}
