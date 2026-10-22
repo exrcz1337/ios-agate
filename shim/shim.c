@@ -134,7 +134,7 @@ static void __attribute__((noreturn)) reset(unsigned after_s)
 		__asm__ volatile("wfe");
 }
 
-/* ---- exceptions ---- */
+static volatile int in_panic;
 
 static void irq_handler(void)
 {
@@ -142,14 +142,14 @@ static void irq_handler(void)
 	uint32_t id = iar & 0xffffff;
 
 	if (id >= 1020 && id <= 1023)
-		return;	/* spurious */
+		return;
 	irq_last = id;
 	if (id == (uint32_t)irq_src)
 		irq_count++;
 	else
 		irq_other++;
 	if (id == VTIMER_INTID)
-		wsr("cntv_tval_el0", rsr("cntfrq_el0") / 100);	/* 10 ms */
+		wsr("cntv_tval_el0", rsr("cntfrq_el0") / 100);
 	else if (id == PTIMER_INTID)
 		wsr("cntp_tval_el0", rsr("cntfrq_el0") / 100);
 	wsr("icc_eoir1_el1", iar);
@@ -162,8 +162,14 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 		irq_handler();
 		return;
 	}
+	if (in_panic++) {
+		for (;;) {
+			wdt_pet();
+			con_flush();
+			delay_ms(100);
+		}
+	}
 	con_clear(BLUE);
-	con_skip();
 	con_skip();
 	int s = slot & 3;
 	if (s == 0)
@@ -175,15 +181,16 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 	else
 		con_str("PANIC", "SERROR");
 	con_hex2("SLOT", "n=", slot, "cpu=", rsr("mpidr_el1"));
-	con_str("STAGE", stage);
-	con_hex("ESR", rsr("esr_el1"));
-	con_hex("ELR", rsr("elr_el1"));
-	con_hex("FAR", rsr("far_el1"));
-	con_hex("SPSR", rsr("spsr_el1"));
+	con_str("STAGE", stage ? stage : "none");
+	con_hex("ESR", regs[33]);
+	con_hex("ELR", regs[34]);
+	con_hex("FAR", regs[35]);
+	con_hex("SPSR", regs[36]);
 	con_hex("LR", regs[30]);
 	con_hex("SP", regs[31]);
 	con_hex("X0", regs[0]);
 	con_hex("X1", regs[1]);
+	con_flush();
 	for (;;) {
 		wdt_pet();
 		con_flush();

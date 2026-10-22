@@ -60,25 +60,12 @@ void con_init(void)
 	if (cfmt == 3)
 		con_bswap ^= 1;
 
-	uint32_t l_size = *(volatile uint32_t *)(0x14000038UL + (uintptr_t)layer * 0x20UL);
-	uint32_t l_pitch = *(volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL) & 0xffff;
+	con_w = FB_W;
+	con_h = FB_H;
+	con_stride = FB_W * con_bpp;
 
-	uint32_t w = l_size & 0xfff;
-	uint32_t h = (l_size >> 16) & 0xfff;
-	if (w >= 320 && w <= 4096)
-		con_w = w;
-	else
-		con_w = FB_W;
-
-	if (h >= 480 && h <= 4096)
-		con_h = h;
-	else
-		con_h = FB_H;
-
-	if (l_pitch >= con_w * con_bpp && l_pitch <= 16384)
-		con_stride = l_pitch;
-	else
-		con_stride = con_w * con_bpp;
+	*(volatile uint32_t *)(0x14000038UL + (uintptr_t)layer * 0x20UL) = ((uint32_t)FB_H << 16) | (uint32_t)FB_W;
+	*(volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL) = con_stride;
 
 	uint32_t rdma_fb = *(volatile uint32_t *)0x14004f00;
 	if (l_addr >= 0x40000000 && l_addr < 0xc0000000)
@@ -179,6 +166,8 @@ static void put_char(int col, char ch, uint32_t fg)
 
 static int put_str(int col, const char *s, uint32_t fg)
 {
+	if (!s)
+		s = "(null)";
 	while (*s)
 		put_char(col++, *s++, fg);
 	return col;

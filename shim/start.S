@@ -125,16 +125,11 @@ dsi_flush_loop:
 	b.lo	3b
 	b	2b
 
-/*
- * Exception vectors. Each slot stashes x29/x30, loads its slot number
- * and jumps to the common path, which saves x0-x28 and calls
- * exc_handler(slot, regs). IRQs return; everything else ends in the
- * on-screen panic.
- */
 .macro vent slot
 	.balign	0x80
-	msr	sp_el0, x29
-	mov	x29, #\slot
+	msr	tpidr_el0, x0
+	msr	sp_el0, x1
+	mov	x0, #\slot
 	b	exc_common
 .endm
 
@@ -159,54 +154,58 @@ vectors:
 	vent 15
 
 exc_common:
-	cmp	x29, #5
+	cmp	x0, #5
 	b.eq	1f
 
 	msr	daifset, #0xf
-	mrs	x30, sctlr_el1
-	bic	x30, x30, #0x1
-	bic	x30, x30, #0x4
-	bic	x30, x30, #0x1000
-	msr	sctlr_el1, x30
+	mrs	x1, sctlr_el1
+	bic	x1, x1, #0x1
+	bic	x1, x1, #0x4
+	bic	x1, x1, #0x1000
+	msr	sctlr_el1, x1
 	isb
 
-	adrp	x30, exc_frame
-	add	x30, x30, :lo12:exc_frame
-	stp	x0, x1, [x30, #0]
-	stp	x2, x3, [x30, #16]
-	stp	x4, x5, [x30, #32]
-	stp	x6, x7, [x30, #48]
-	stp	x8, x9, [x30, #64]
-	stp	x10, x11, [x30, #80]
-	stp	x12, x13, [x30, #96]
-	stp	x14, x15, [x30, #112]
-	stp	x16, x17, [x30, #128]
-	stp	x18, x19, [x30, #144]
-	stp	x20, x21, [x30, #160]
-	stp	x22, x23, [x30, #176]
-	stp	x24, x25, [x30, #192]
-	stp	x26, x27, [x30, #208]
-	str	x28, [x30, #224]
-	mrs	x0, sp_el0
-	mrs	x1, elr_el1
-	stp	x0, x1, [x30, #232]
-	mov	x0, sp
-	str	x0, [x30, #248]
+	adrp	x1, exc_frame
+	add	x1, x1, :lo12:exc_frame
+	stp	x2, x3, [x1, #16]
+	stp	x4, x5, [x1, #32]
+	stp	x6, x7, [x1, #48]
+	stp	x8, x9, [x1, #64]
+	stp	x10, x11, [x1, #80]
+	stp	x12, x13, [x1, #96]
+	stp	x14, x15, [x1, #112]
+	stp	x16, x17, [x1, #128]
+	stp	x18, x19, [x1, #144]
+	stp	x20, x21, [x1, #160]
+	stp	x22, x23, [x1, #176]
+	stp	x24, x25, [x1, #192]
+	stp	x26, x27, [x1, #208]
+	stp	x28, x29, [x1, #224]
+	str	x30, [x1, #240]
+	mov	x2, sp
+	str	x2, [x1, #248]
+	mrs	x2, tpidr_el0
+	mrs	x3, sp_el0
+	stp	x2, x3, [x1, #0]
+	str	x0, [x1, #256]
+	mrs	x2, esr_el1
+	mrs	x3, elr_el1
+	stp	x2, x3, [x1, #264]
+	mrs	x2, far_el1
+	mrs	x3, spsr_el1
+	stp	x2, x3, [x1, #280]
 
-	adrp	x0, _stack_top
-	add	x0, x0, :lo12:_stack_top
-	mov	sp, x0
+	adrp	x2, _stack_top
+	add	x2, x2, :lo12:_stack_top
+	mov	sp, x2
 
-	mov	x0, x29
-	mov	x1, x30
 	bl	exc_handler
 
 2:	wfe
 	b	2b
 
 1:
-	sub	sp, sp, #(30 * 8)
-	stp	x0, x1, [sp, #0]
+	sub	sp, sp, #(32 * 8)
 	stp	x2, x3, [sp, #16]
 	stp	x4, x5, [sp, #32]
 	stp	x6, x7, [sp, #48]
@@ -220,14 +219,17 @@ exc_common:
 	stp	x22, x23, [sp, #176]
 	stp	x24, x25, [sp, #192]
 	stp	x26, x27, [sp, #208]
-	str	x28, [sp, #224]
-	mrs	x0, sp_el0
-	stp	x0, x30, [sp, #-16]!
-	mov	x0, x29
-	add	x1, sp, #16
+	stp	x28, x29, [sp, #224]
+	str	x30, [sp, #240]
+	mrs	x2, tpidr_el0
+	mrs	x3, sp_el0
+	stp	x2, x3, [sp, #0]
+	mov	x0, #5
+	mov	x1, sp
 	bl	exc_handler
-	ldp	x29, x30, [sp], #16
-	ldp	x0, x1, [sp, #0]
+	ldp	x2, x3, [sp, #0]
+	msr	tpidr_el0, x2
+	msr	sp_el0, x3
 	ldp	x2, x3, [sp, #16]
 	ldp	x4, x5, [sp, #32]
 	ldp	x6, x7, [sp, #48]
@@ -241,12 +243,15 @@ exc_common:
 	ldp	x22, x23, [sp, #176]
 	ldp	x24, x25, [sp, #192]
 	ldp	x26, x27, [sp, #208]
-	ldr	x28, [sp, #224]
-	add	sp, sp, #(30 * 8)
+	ldp	x28, x29, [sp, #224]
+	ldr	x30, [sp, #240]
+	add	sp, sp, #(32 * 8)
+	mrs	x0, tpidr_el0
+	mrs	x1, sp_el0
 	eret
 
 	.data
 	.balign 16
 	.globl exc_frame
 exc_frame:
-	.space 256
+	.space 512
