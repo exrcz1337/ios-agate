@@ -1,22 +1,17 @@
-/*
- * Milestone 4: act as iBoot for xnu.
- *
- * mkpayload.py already resolved the kernel's chained fixups and built the
- * ADT, so this only has to: find the payload in the ABL ramdisk, copy the
- * segments to phys_base + (vmaddr - virt_base), place the ADT and
- * boot_args behind the kernel, and jump to the entry point with the MMU
- * and caches off, x0 = boot_args (physical).
- */
 #include <stdint.h>
 #include "console.h"
 #include "fdt.h"
 #include "loader.h"
+#include "/home/exerczz1/hackios/hackios-xnu-kernel/xnuloader/efi.h"
 
-#define BOOT_LINE_LENGTH	608
-#define PAGE_16K		0x4000UL
-#define PSCI_CPU_ON		0xc4000003UL
+#define PSCI_CPU_ON 0xc4000003UL
+#define PSCI_SYSTEM_RESET 0x84000009UL
+#define PAYLOAD_BASE 0xF0000000ULL
+#define PAYLOAD_MAGIC 0x50554E58u
 
 extern char dsi_flush_loop[];
+extern efi_status EFIAPI efi_main(efi_handle image, efi_system_table *st);
+char __ImageBase = 0;
 
 static uint64_t smc(uint64_t fn, uint64_t a1, uint64_t a2, uint64_t a3)
 {
@@ -33,41 +28,6 @@ static uint64_t smc(uint64_t fn, uint64_t a1, uint64_t a2, uint64_t a3)
 	return x0;
 }
 
-struct payload_seg {
-	uint64_t vmaddr, vmsize, file_off, file_size;
-};
-
-struct payload {
-	char magic[8];
-	uint32_t version, nsegs;
-	uint64_t virt_base, entry_va, adt_off, adt_size, kernel_end;
-	uint64_t phys_base, mem_size;
-	char cmdline[BOOT_LINE_LENGTH];
-	struct payload_seg segs[];
-};
-
-/* pexpert/pexpert/arm64/boot.h, Revision/Version 2 */
-struct boot_video {
-	uint64_t v_baseAddr, v_display, v_rowBytes, v_width, v_height, v_depth;
-};
-
-struct boot_args {
-	uint16_t Revision, Version;
-	uint64_t virtBase, physBase, memSize, topOfKernelData;
-	struct boot_video Video;
-	uint32_t machineType;
-	uint64_t deviceTreeP;
-	uint32_t deviceTreeLength;
-	char CommandLine[BOOT_LINE_LENGTH];
-	uint64_t bootFlags, memSizeActual;
-};
-
-_Static_assert(__builtin_offsetof(struct payload, segs) == 0x2a8, "payload header layout");
-_Static_assert(__builtin_offsetof(struct boot_args, Video) == 40, "boot_args layout");
-_Static_assert(__builtin_offsetof(struct boot_args, CommandLine) == 108, "boot_args layout");
-_Static_assert(sizeof(struct boot_args) == 736, "boot_args layout");
-
-/* MMU off: everything is Device memory, so copy in aligned 8-byte words. */
 static void copy64(uintptr_t dst, uintptr_t src, uint64_t n)
 {
 	volatile uint64_t *d = (volatile uint64_t *)dst;
@@ -76,28 +36,119 @@ static void copy64(uintptr_t dst, uintptr_t src, uint64_t n)
 		d[i] = s[i];
 }
 
-static void zero64(uintptr_t dst, uint64_t n)
+static efi_gop_mode_info gop_info;
+static efi_gop_mode gop_mode;
+static efi_gop gop;
+static efi_text_output text_out;
+static efi_boot_services boot_services;
+static efi_runtime_services runtime_services;
+static efi_system_table system_table;
+
+static uintptr_t bump_mem = 0x60000000ULL;
+
+static efi_status EFIAPI efi_set_watchdog_timer(uint64_t timeout, uint64_t code, uint64_t size, char16 *data)
 {
-	volatile uint64_t *d = (volatile uint64_t *)dst;
-	for (uint64_t i = 0; i < n / 8; i++)
-		d[i] = 0;
+	(void)timeout;
+	(void)code;
+	(void)size;
+	(void)data;
+	return 0;
 }
 
-static int magic_ok(const char *m)
+static efi_status EFIAPI efi_locate_protocol(const efi_guid *guid, void *reg, void **iface)
 {
-	static const char want1[] = "AGATEXNU";
-	static const char want2[] = "SWEETXNU";
-	int ok1 = 1, ok2 = 1;
-	for (int i = 0; i < 8; i++) {
-		if (m[i] != want1[i])
-			ok1 = 0;
-		if (m[i] != want2[i])
-			ok2 = 0;
+	static const efi_guid gop_guid = EFI_GOP_GUID;
+	(void)reg;
+	if (guid && iface) {
+		const uint8_t *g1 = (const uint8_t *)guid;
+		const uint8_t *g2 = (const uint8_t *)&gop_guid;
+		int match = 1;
+		for (int i = 0; i < 16; i++) {
+			if (g1[i] != g2[i]) {
+				match = 0;
+				break;
+			}
+		}
+		if (match) {
+			*iface = &gop;
+			return 0;
+		}
 	}
-	return ok1 || ok2;
+	return 0x800000000000000eULL;
 }
 
-typedef void (*xnu_entry_t)(uint64_t boot_args_pa);
+static efi_status EFIAPI efi_get_memory_map(uint64_t *size, void *map, uint64_t *key, uint64_t *desc_size, uint32_t *desc_ver)
+{
+	if (!size || !map || !key || !desc_size || !desc_ver)
+		return 0x8000000000000002ULL;
+	*desc_size = sizeof(efi_memory_descriptor);
+	*desc_ver = 1;
+	*key = 1;
+	if (*size < sizeof(efi_memory_descriptor)) {
+		*size = sizeof(efi_memory_descriptor);
+		return 0x8000000000000005ULL;
+	}
+	*size = sizeof(efi_memory_descriptor);
+	efi_memory_descriptor *d = (efi_memory_descriptor *)map;
+	d[0].type = EfiConventionalMemory;
+	d[0].pad = 0;
+	d[0].phys_start = 0x80000000ULL;
+	d[0].virt_start = 0;
+	d[0].pages = 0x60000000ULL >> 12;
+	d[0].attribute = 0;
+	return 0;
+}
+
+static efi_status EFIAPI efi_allocate_pages(int type, int mem_type, uint64_t pages, uint64_t *addr)
+{
+	(void)type;
+	(void)mem_type;
+	if (!addr)
+		return 0x8000000000000002ULL;
+	*addr = bump_mem;
+	bump_mem += pages << 12;
+	return 0;
+}
+
+static efi_status EFIAPI efi_stall(uint64_t us)
+{
+	uint64_t start = 0;
+	__asm__ volatile("mrs %0, cntvct_el0" : "=r"(start));
+	uint64_t ticks = us * 13;
+	uint64_t cur = 0;
+	do {
+		__asm__ volatile("mrs %0, cntvct_el0" : "=r"(cur));
+	} while (cur - start < ticks);
+	return 0;
+}
+
+static void EFIAPI efi_reset_system(int type, efi_status status, uint64_t size, void *data)
+{
+	(void)type;
+	(void)status;
+	(void)size;
+	(void)data;
+	smc(PSCI_SYSTEM_RESET, 0, 0, 0);
+	for (;;) {}
+}
+
+static efi_status EFIAPI con_out_string(struct efi_text_output *self, const char16 *str)
+{
+	(void)self;
+	if (!str)
+		return 0;
+	char buf[128];
+	int i = 0;
+	while (*str) {
+		buf[i++] = (char)(*str++);
+		if (i == 127 || *str == 0) {
+			buf[i] = 0;
+			con_str("XNU", buf);
+			i = 0;
+		}
+	}
+	return 0;
+}
 
 const char *loader_boot(uintptr_t dtb)
 {
@@ -108,62 +159,47 @@ const char *loader_boot(uintptr_t dtb)
 		return "no initrd in /chosen";
 	con_hex2("INITRD", "lo=", rd_start, "hi=", rd_end);
 
-	const struct payload *p = (const struct payload *)rd_start;
-	if (!magic_ok(p->magic))
-		return "no AGATEXNU payload";
-	if (p->version != 1 || (p->adt_off & 7) || (rd_start & 7))
-		return "bad payload header";
+	volatile uint32_t *p_magic = (volatile uint32_t *)rd_start;
+	if (*p_magic != PAYLOAD_MAGIC)
+		return "no XNUP payload";
 
-	uint64_t pa_of_va_base = p->phys_base - p->virt_base;
-	con_hex2("PHYS", "base=", p->phys_base, "size=", p->mem_size);
-	con_hex("VIRT", p->virt_base);
-	con_hex("ENTRY", p->entry_va);
+	con_str("LOADER", "copying payload to PAYLOAD_BASE");
+	copy64(PAYLOAD_BASE, rd_start, rd_end - rd_start);
 
-	uintptr_t kernel_top = p->kernel_end + pa_of_va_base + p->adt_size + 2 * PAGE_16K;
-	if (rd_end > p->phys_base && rd_start < kernel_top)
-		return "ramdisk overlaps kernel image";
+	con_str("LOADER", "starting dsi_flush_loop on cpu 1");
+	smc(PSCI_CPU_ON, 0x100, (uint64_t)(uintptr_t)dsi_flush_loop, 0);
 
-	for (uint32_t i = 0; i < p->nsegs; i++) {
-		const struct payload_seg *s = &p->segs[i];
-		uintptr_t dst = s->vmaddr + pa_of_va_base;
-		copy64(dst, rd_start + s->file_off, s->file_size);
-		if (s->vmsize > s->file_size)
-			zero64(dst + ((s->file_size + 7) & ~7UL), s->vmsize - ((s->file_size + 7) & ~7UL));
-	}
-	con_hex2("SEGS", "n=", p->nsegs, "end=", p->kernel_end + pa_of_va_base);
+	gop_info.version = 0;
+	gop_info.width = con_w;
+	gop_info.height = con_h;
+	gop_info.pixel_format = 1;
+	gop_info.pixels_per_scanline = con_w;
 
-	/* ADT, then boot_args, behind the kernel; everything below topOfKernelData is ours. */
-	uintptr_t adt_pa = p->kernel_end + pa_of_va_base;
-	copy64(adt_pa, rd_start + p->adt_off, p->adt_size);
-	uintptr_t ba_pa = (adt_pa + p->adt_size + PAGE_16K - 1) & ~(PAGE_16K - 1);
-	uintptr_t top = ba_pa + PAGE_16K;
+	gop_mode.max_mode = 1;
+	gop_mode.mode = 0;
+	gop_mode.info = &gop_info;
+	gop_mode.info_size = sizeof(gop_info);
+	gop_mode.fb_base = (uint64_t)(uintptr_t)con_fb;
+	gop_mode.fb_size = (uint64_t)con_stride * con_h;
 
-	zero64(ba_pa, PAGE_16K);
-	volatile struct boot_args *ba = (volatile struct boot_args *)ba_pa;
-	ba->Revision = 2;
-	ba->Version = 2;
-	ba->virtBase = p->virt_base;
-	ba->physBase = p->phys_base;
-	ba->memSize = p->mem_size;
-	ba->topOfKernelData = top;
-	ba->Video.v_baseAddr = (uint64_t)(uintptr_t)con_fb;
-	ba->Video.v_display = 1;
-	ba->Video.v_rowBytes = con_stride;
-	ba->Video.v_width = con_w;
-	ba->Video.v_height = con_h;
-	ba->Video.v_depth = con_bpp * 8;
-	ba->deviceTreeP = adt_pa - pa_of_va_base;	/* xnu reads it with the MMU on: a VA */
-	ba->deviceTreeLength = (uint32_t)p->adt_size;
-	for (int i = 0; i < BOOT_LINE_LENGTH; i++)
-		ba->CommandLine[i] = p->cmdline[i];
-	ba->memSizeActual = p->mem_size;
-	con_hex2("BOOTARG", "pa=", ba_pa, "top=", top);
+	gop.mode = &gop_mode;
 
-	uintptr_t entry_pa = p->entry_va + pa_of_va_base;
-	con_hex("JUMP", entry_pa);
-	con_str("XNU", "jumping (fbcon clears screen)");
+	text_out.output_string = con_out_string;
 
-	__asm__ volatile("dsb sy; ic iallu; dsb sy; isb" ::: "memory");
-	((xnu_entry_t)entry_pa)(ba_pa);
-	return "xnu returned";
+	boot_services.set_watchdog_timer = efi_set_watchdog_timer;
+	boot_services.locate_protocol = efi_locate_protocol;
+	boot_services.get_memory_map = efi_get_memory_map;
+	boot_services.allocate_pages = efi_allocate_pages;
+	boot_services.stall = efi_stall;
+
+	runtime_services.reset_system = efi_reset_system;
+
+	system_table.bs = &boot_services;
+	system_table.rt = &runtime_services;
+	system_table.con_out = &text_out;
+
+	con_str("LOADER", "entering efi_main");
+	efi_main(0, &system_table);
+
+	return "efi_main returned";
 }

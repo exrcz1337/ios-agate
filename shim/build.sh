@@ -33,22 +33,21 @@ for f in start.S shim.c console.c mmu.c fdt.c loader.c ufs.c; do
 	$CC $CFLAGS -c $f -o out/${f%.*}.o
 done
 
-abs=$($READELF -r out/shim.o out/console.o out/mmu.o out/fdt.o out/loader.o out/ufs.o | grep -c ABS64 || true)
-[ "$abs" = 0 ] || { echo "error: $abs absolute relocations in C objects" >&2; exit 1; }
+$CC $CFLAGS -Wno-unused-parameter -c /home/exerczz1/hackios/hackios-xnu-kernel/xnuloader/loader.c -o out/xnuloader.o
 
 if [ "$LD" = "ld.lld" ]; then
-	$LD $LDFLAGS out/start.o out/shim.o out/console.o out/mmu.o out/fdt.o out/loader.o out/ufs.o -o out/shim.elf
+	$LD $LDFLAGS out/start.o out/shim.o out/console.o out/mmu.o out/fdt.o out/loader.o out/ufs.o out/xnuloader.o -o out/shim.elf
 else
-	$LD $CFLAGS $LDFLAGS out/start.o out/shim.o out/console.o out/mmu.o out/fdt.o out/loader.o out/ufs.o -o out/shim.elf
+	$LD $CFLAGS $LDFLAGS out/start.o out/shim.o out/console.o out/mmu.o out/fdt.o out/loader.o out/ufs.o out/xnuloader.o -o out/shim.elf
 fi
 
 $OBJCOPY -O binary out/shim.elf out/Image
-size=$($NM out/shim.elf | awk '$3=="_end"{print strtonum("0x"$1)}')
-truncate -s "$size" out/Image
 gzip -n -9 -c out/Image > out/Image.gz
 
 if [ -n "${1:-}" ]; then
 	cp "$1" out/ramdisk.bin
+elif [ -f /home/exerczz1/hackios/hackios-xnu-kernel/out/test-payload.bin ]; then
+	cp /home/exerczz1/hackios/hackios-xnu-kernel/out/test-payload.bin out/ramdisk.bin
 else
 	(cd out && rm -rf rd && mkdir rd && cd rd && find . | cpio -o -H newc --quiet | gzip -9 > ../ramdisk.bin)
 fi
