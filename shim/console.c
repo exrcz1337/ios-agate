@@ -42,8 +42,7 @@ void con_init(void)
 		layer = 3;
 
 	uint32_t l_con = *(volatile uint32_t *)(0x14000030UL + (uintptr_t)layer * 0x20UL);
-	uint32_t l_size = *(volatile uint32_t *)(0x14000038UL + (uintptr_t)layer * 0x20UL);
-	uint32_t l_pitch = *(volatile uint32_t *)(0x14000044UL + (uintptr_t)layer * 0x20UL) & 0xffff;
+
 	uint32_t l_addr = *(volatile uint32_t *)(0x14000f40UL + (uintptr_t)layer * 0x20UL);
 
 	uint32_t cfmt = (l_con >> 12) & 0xf;
