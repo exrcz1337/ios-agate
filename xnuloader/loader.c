@@ -334,13 +334,31 @@ write_logs(const char *klog, uint64_t klog_len)
 
 	compose_logs(klog, klog_len);
 	if (bio == NULL) {
-		/* No log partition (QEMU): echo the returned kernel log on the console instead. */
-		if (klog != NULL) {
-			print("\n== KERNEL LOG ==\n");
-			for (uint64_t i = 0; i < klog_len; i++) {
-				put_char(klog[i]);
+		if (klog != NULL && klog_len > 0) {
+			for (;;) {
+				uint64_t pos = 0;
+				int page = 1;
+				while (pos < klog_len) {
+					put_char('\f');
+					print("\n-- KERNEL LOG p.%d (%d bytes) --\n", (uint64_t)page, klog_len);
+					int lines = 0;
+					while (pos < klog_len && lines < 36) {
+						char c = klog[pos++];
+						if (c == '\r')
+							continue;
+						put_char(c);
+						if (c == '\n')
+							lines++;
+					}
+					page++;
+					for (int s = 0; s < 7; s++) {
+						BS->stall(1000000);
+					}
+				}
 			}
-			print("\n== END OF LOG ==\n");
+		}
+		for (;;) {
+			BS->stall(1000000);
 		}
 		return;
 	}
@@ -579,7 +597,7 @@ static const struct platform *const platforms[] = {
 
 /* ------------------------------------------------------------------------ */
 
-static void
+static void __attribute__((unused))
 reboot(void)
 {
 	hc_take_back("before the reset");
@@ -3982,7 +4000,8 @@ efi_main(efi_handle image, efi_system_table *st)
 	if (have_payload) {
 		run_kernel(0, 0);
 	}
-	BS->stall(30000000);
-	reboot();
+	for (;;) {
+		BS->stall(1000000);
+	}
 	return 0;
 }
