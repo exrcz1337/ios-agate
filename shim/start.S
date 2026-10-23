@@ -111,14 +111,18 @@ dsi_flush_loop:
 	movk	x3, #0x1411, lsl #16
 	movz	x4, #0xe000
 	movk	x4, #0x1400, lsl #16
-2:	dsb	sy
+	movz	x5, #0xe00c
+	movk	x5, #0x1400, lsl #16
+2:	ldr	w1, [x5]
+	tbnz	w1, #31, 2b
+	dsb	sy
 	mov	w1, #1
 	str	w1, [x3]
 	str	wzr, [x4]
 	str	w1, [x4]
 	dsb	sy
 	mrs	x0, cntpct_el0
-	mov	x2, #0x100000
+	mov	x2, #0x180000
 	add	x0, x0, x2
 3:	mrs	x1, cntpct_el0
 	cmp	x1, x0
