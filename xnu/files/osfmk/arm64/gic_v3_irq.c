@@ -475,7 +475,6 @@ gic_v3_irq_cpu_init(void)
 
 	/* Virtual timer PPI (and those): Group 1 (IRQ), default priority, enabled */
 	gic_write32(gicr + GICR_IGROUPR0, gic_read32(gicr + GICR_IGROUPR0) | mine);
-	gic_write32(gicr + GICR_IGRPMODR0, gic_read32(gicr + GICR_IGRPMODR0) & ~mine);
 	*(volatile uint8_t *)(gicr + GICR_IPRIORITYR(GIC_INTID_VTIMER)) = GIC_PRIORITY_DEFAULT;
 	gic_write32(gicr + GICR_ISENABLER0, mine);
 
