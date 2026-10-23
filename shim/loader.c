@@ -9,7 +9,6 @@
 #define PAYLOAD_BASE 0xF0000000ULL
 #define PAYLOAD_MAGIC 0x50554E58u
 
-extern char dsi_flush_loop[];
 extern efi_status EFIAPI efi_main(efi_handle image, efi_system_table *st);
 char __ImageBase = 0;
 
@@ -247,7 +246,6 @@ const char *loader_boot(uintptr_t dtb)
 	system_table.con_out = &text_out;
 
 	con_str("LOADER", "entering efi_main");
-	smc(PSCI_CPU_ON, 0x100, (uint64_t)(uintptr_t)dsi_flush_loop, 0);
 	efi_main(0, &system_table);
 
 	return "efi_main returned";
