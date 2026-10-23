@@ -2949,15 +2949,6 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
 		}
 	}
 
-	uint32_t *pe_err = (uint32_t *)(0xfffffff0079eb4a4ULL + slide);
-	pe_err[0] = 0x52800020;
-	pe_err[1] = 0xd65f03c0;
-
-	uint32_t *gic_igrp = (uint32_t *)(0xfffffff007474958ULL + slide);
-	gic_igrp[0] = 0xd503201f;
-	gic_igrp[1] = 0xd503201f;
-	gic_igrp[2] = 0xd503201f;
-
 	/* --- boot_args ------------------------------------------------------ */
 	struct boot_args *ba = (struct boot_args *)ba_pa;
 	memset(ba, 0, sizeof(*ba));
