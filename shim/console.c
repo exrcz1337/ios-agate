@@ -23,7 +23,7 @@ void con_flush(void)
 	static uint64_t last_flush = 0;
 	uint64_t now_val = 0;
 	__asm__ volatile("isb; mrs %0, cntpct_el0" : "=r"(now_val));
-	if (now_val - last_flush < 130000 && last_flush != 0)
+	if (now_val - last_flush < 200000 && last_flush != 0)
 		return;
 	last_flush = now_val;
 	con_flush_force();
@@ -33,6 +33,9 @@ void con_flush(void)
 void con_flush_force(void)
 {
 #ifndef __x86_64__
+	uint32_t timeout = 1000000;
+	while ((*(volatile uint32_t *)0x1400e00c & 0x80000000) && --timeout)
+		;
 	__asm__ volatile("dsb sy" ::: "memory");
 	*(volatile uint32_t *)0x14117020 = 1;
 	*(volatile uint32_t *)0x1400e000 = 0;
@@ -193,9 +196,57 @@ static void fmt_hex(char *buf, uint64_t v, int digits)
 	buf[digits] = 0;
 }
 
+static void con_newline(void)
+{
+	int max_rows = (con_h - MARGIN * 2) / CH_H;
+	if (row < max_rows - 1) {
+		row++;
+		return;
+	}
+	uint64_t *dst = (uint64_t *)((uint8_t *)con_fb + MARGIN * con_stride);
+	const uint64_t *src = (const uint64_t *)((uint8_t *)con_fb + (MARGIN + CH_H) * con_stride);
+	uint64_t count = ((uint64_t)(max_rows - 1) * CH_H * con_stride) / 8;
+	for (uint64_t i = 0; i < count; i++)
+		dst[i] = src[i];
+	uint8_t r = (con_bg >> 16) & 0xff;
+	uint8_t g = (con_bg >> 8) & 0xff;
+	uint8_t b = con_bg & 0xff;
+	if (con_bswap) {
+		uint8_t t = r;
+		r = b;
+		b = t;
+	}
+	int y_start = MARGIN + (max_rows - 1) * CH_H;
+	if (con_bpp == 3) {
+		for (int y = 0; y < CH_H; y++) {
+			uint8_t *line = (uint8_t *)con_fb + (y_start + y) * con_stride;
+			for (int x = 0; x < (int)con_w; x++) {
+				line[x * 3 + 0] = r;
+				line[x * 3 + 1] = g;
+				line[x * 3 + 2] = b;
+			}
+		}
+	} else if (con_bpp == 4) {
+		uint32_t px = (0xffU << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
+		uint64_t px64 = ((uint64_t)px << 32) | px;
+		for (int y = 0; y < CH_H; y++) {
+			volatile uint64_t *line = (volatile uint64_t *)((uint8_t *)con_fb + (y_start + y) * con_stride);
+			for (int x = 0; x < (int)con_w / 2; x++)
+				line[x] = px64;
+		}
+	} else if (con_bpp == 2) {
+		uint16_t v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+		for (int y = 0; y < CH_H; y++) {
+			uint16_t *line = (uint16_t *)((uint8_t *)con_fb + (y_start + y) * con_stride);
+			for (int x = 0; x < (int)con_w; x++)
+				line[x] = v;
+		}
+	}
+}
+
 void con_skip(void)
 {
-	row++;
+	con_newline();
 }
 
 void con_str(const char *label, const char *s)
@@ -210,12 +261,12 @@ void con_str(const char *label, const char *s)
 		s = "(null)";
 	while (*s) {
 		if (col >= max_cols) {
-			row++;
+			con_newline();
 			col = 0;
 		}
 		put_char(col++, *s++, WHITE);
 	}
-	row++;
+	con_newline();
 }
 
 void con_hex(const char *label, uint64_t v)
@@ -238,5 +289,5 @@ void con_hex2(const char *label, const char *a, uint32_t va, const char *b, uint
 		fmt_hex(buf, vb, 8);
 		put_str(col, buf, WHITE);
 	}
-	row++;
+	con_newline();
 }

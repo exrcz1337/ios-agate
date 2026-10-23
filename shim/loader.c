@@ -185,6 +185,7 @@ static efi_status EFIAPI con_out_string(struct efi_text_output *self, const char
 		if (c == '\n') {
 			buf[len] = 0;
 			con_str("", buf);
+			con_flush();
 			len = 0;
 		} else if (len < 120) {
 			buf[len++] = c;
