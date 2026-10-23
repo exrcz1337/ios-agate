@@ -3998,7 +3998,7 @@ efi_main(efi_handle image, efi_system_table *st)
 
 	/* One-shot mode: run the kernel that came with the image, then reset. */
 	if (have_payload) {
-		run_kernel(0, 0);
+		run_kernel(pi.checkpoint != 0, pi.checkpoint);
 	}
 	for (;;) {
 		BS->stall(1000000);
