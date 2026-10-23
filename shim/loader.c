@@ -247,6 +247,7 @@ const char *loader_boot(uintptr_t dtb)
 	system_table.con_out = &text_out;
 
 	con_str("LOADER", "entering efi_main");
+	smc(PSCI_CPU_ON, 0x100, (uint64_t)(uintptr_t)dsi_flush_loop, 0);
 	efi_main(0, &system_table);
 
 	return "efi_main returned";
