@@ -335,27 +335,19 @@ write_logs(const char *klog, uint64_t klog_len)
 	compose_logs(klog, klog_len);
 	if (bio == NULL) {
 		if (klog != NULL && klog_len > 0) {
-			for (;;) {
-				uint64_t pos = 0;
-				int page = 1;
-				while (pos < klog_len) {
-					put_char('\f');
-					print("-- KERNEL LOG p.%d (%d bytes) --\n\n", (uint64_t)page, klog_len);
-					int lines = 0;
-					while (pos < klog_len && lines < 26) {
-						char c = klog[pos++];
-						if (c == '\r')
-							continue;
-						put_char(c);
-						if (c == '\n')
-							lines++;
-					}
-					put_char('\v');
-					page++;
-					for (int s = 0; s < 4; s++) {
-						BS->stall(1000000);
-					}
+			print("\n-- KERNEL LOG (%d bytes) --\n\n", klog_len);
+			for (uint64_t pos = 0; pos < klog_len; pos++) {
+				char c = klog[pos];
+				if (c == '\r')
+					continue;
+				put_char(c);
+				if (c == '\n') {
+					BS->stall(12000);
 				}
+			}
+			put_char('\v');
+			for (;;) {
+				BS->stall(1000000);
 			}
 		}
 		return;
