@@ -187,8 +187,13 @@ static efi_status EFIAPI con_out_string(struct efi_text_output *self, const char
 			con_str("", buf);
 			con_flush();
 			len = 0;
-		} else if (len < 120) {
+		} else if ((unsigned char)c >= 0x20 && (unsigned char)c <= 0x7e && len < 120) {
 			buf[len++] = c;
+		} else if (c == '\t' && len < 116) {
+			buf[len++] = ' ';
+			buf[len++] = ' ';
+			buf[len++] = ' ';
+			buf[len++] = ' ';
 		}
 	}
 	return 0;

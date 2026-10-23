@@ -416,7 +416,7 @@ void shim_main(uint64_t dtb)
 		con_fb = (volatile void *)fb;
 
 	stage = "loader";
-	con_clear(RED);
+	con_clear(0);
 	con_str("SHIM", "hi from exerczz1 <3");
 	con_str("SHIM", "agate milestone 4: xnu loader");
 	con_hex2("FB", "addr=", (uint32_t)(uintptr_t)con_fb, "stride=", con_stride);
