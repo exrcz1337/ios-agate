@@ -155,6 +155,8 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 		irq_handler();
 		return;
 	}
+	if (slot == 3 || slot == 7)
+		return;
 	if (in_panic++) {
 		for (;;) {
 			wdt_pet();
@@ -424,6 +426,7 @@ void shim_main(uint64_t dtb)
 	con_hex2("FMT", "bpp=", con_bpp, "bswap=", con_bswap);
 	con_skip();
 	con_flush();
+	__asm__ volatile("msr daifclr, #4\nisb\ndsb sy\nmsr daifset, #4" ::: "memory");
 	const char *why = loader_boot(dtb);
 	con_str("LOADER", why);
 	con_skip();

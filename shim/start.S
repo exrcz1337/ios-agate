@@ -157,6 +157,10 @@ vectors:
 exc_common:
 	cmp	x0, #5
 	b.eq	1f
+	cmp	x0, #3
+	b.eq	1f
+	cmp	x0, #7
+	b.eq	1f
 
 	msr	daifset, #0xf
 
@@ -238,7 +242,6 @@ exc_common:
 	mrs	x2, tpidr_el0
 	mrs	x3, sp_el0
 	stp	x2, x3, [sp, #0]
-	mov	x0, #5
 	mov	x1, sp
 	bl	exc_handler
 	ldp	x2, x3, [sp, #0]
